@@ -916,8 +916,14 @@ var Environment = P(MathCommand, function(_, super_) {
   };
 });
 
+var MatrixTypes = { // DAN
+  MATRIX: 'Matrix',
+  ALIGNED: 'Aligned'
+}
+
 var Matrix =
 Environments.matrix = P(Environment, function(_, super_) {
+  _.matrixType = MatrixTypes.MATRIX;
 
   var delimiters = {
     column: '&',
@@ -967,18 +973,24 @@ Environments.matrix = P(Environment, function(_, super_) {
 
     // Build <tr><td>.. structure from cells
     this.eachChild(function (cell) {
-      if (row !== cell.row) {
+      var isFirstColumn = row !== cell.row;
+      if (isFirstColumn) {
         row = cell.row;
         trs += '<tr>$tds</tr>';
         cells[row] = [];
       }
+      if (this.parent.htmlColumnSeparator && !isFirstColumn) {
+        cells[row].push(this.parent.htmlColumnSeparator);
+      }
       cells[row].push('<td>&'+(i++)+'</td>');
     });
+
+    var tableClasses = this.extraTableClasses ? 'mq-non-leaf ' + this.extraTableClasses : 'mq-non-leaf';
 
     this.htmlTemplate =
         '<span class="mq-matrix mq-non-leaf">'
       +   parenHtml(this.parentheses.left)
-      +   '<table class="mq-non-leaf">'
+      +   '<table class="' + tableClasses + '">'
       +     trs.replace(/\$tds/g, function () {
               return cells.shift().join('');
             })
@@ -991,6 +1003,9 @@ Environments.matrix = P(Environment, function(_, super_) {
   };
   // Create default 4-cell matrix
   _.createBlocks = function() {
+    if (this.matrixType != MatrixTypes.MATRIX) {
+      throw new Error("Must override createBlocks() function")
+    }
     this.blocks = [
       MatrixCell(0, this),
       MatrixCell(0, this),
@@ -999,6 +1014,10 @@ Environments.matrix = P(Environment, function(_, super_) {
     ];
   };
   _.parser = function() {
+    
+    if (this.matrixType != MatrixTypes.MATRIX) {
+      throw new Error("Must override parser() function")
+    }
     var self = this;
     var optWhitespace = Parser.optWhitespace;
     var string = Parser.string;
@@ -1093,7 +1112,8 @@ Environments.matrix = P(Environment, function(_, super_) {
         shortfall = maxLength - rows[i].length;
         while (shortfall) {
           position = maxLength*i + rows[i].length;
-          blocks.splice(position, 0, MatrixCell(i, this));
+          blocks.splice(position, 0, 
+            (this.matrixType == MatrixTypes.MATRIX ? MatrixCell(i, this) : AlignedCell(i, this)));
           shortfall-=1;
         }
       }
@@ -1294,9 +1314,146 @@ Environments.Vmatrix = P(Matrix, function(_, super_) {
   };
 });
 
+var Aligned = // DAN
+Environments['aligned'] = P(Matrix, function (_, super_) {
+  _.matrixType = MatrixTypes.MATRIX;
+  var delimiters = {
+    column: '&',
+    row: '\\\\'
+  };
+  _.extraTableClasses = 'rcl';
+  _.environment = 'aligned';
+  var equalities = ['=', '<', '>', '\\le ', '\\ge '] // DAN todo: add all equalities
+
+  // Don't delete empty columns, the align environment is for equations and should always have two columns.
+  _.removeEmptyColumns = false;
+  // For the same reason, don't allow adding columns.
+  //_.addColumn = function() {};
+
+  // _.latex = function() {
+
+  // };
+
+  _.latex = function() {
+    var latex = '';
+    var row;
+
+    this.eachChild(function (cell) {
+      if (typeof row !== 'undefined') {
+        if (row !== cell.row) {
+          latex += delimiters.row;
+        }
+        else { // DAN
+          if (equalities.includes(cell.ends[R].ctrlSeq)) {
+            latex += delimiters.column;
+          }
+        }
+      }
+      row = cell.row;
+      latex += cell.latex();
+    });
+
+    return this.wrappers().join(latex);
+  };
+
+  _.createBlocks = function() {
+    this.blocks = [
+      AlignedCell(0, this),
+      AlignedCell(0, this),
+      AlignedCell(0, this),
+      AlignedCell(1, this),
+      AlignedCell(1, this),
+      AlignedCell(1, this)
+    ];
+  };
+
+  _.parser = function() {
+    var self = this;
+    var optWhitespace = Parser.optWhitespace;
+    var string = Parser.string;
+
+    return optWhitespace
+    .then(string(delimiters.column)
+      .or(string(delimiters.row))
+      .or(latexMathParser.block))
+    .many()
+    .skip(optWhitespace)
+    .then(function(items) {
+      var blocks = [];
+      var row = 0;
+      self.blocks = [];
+
+      function addCell() {
+        self.blocks.push(AlignedCell(row, self, blocks));
+        blocks = [];
+      }
+
+      for (var i=0; i<items.length; i+=1) {
+        if (items[i] instanceof MathBlock) {
+          blocks.push(items[i]);
+          // if (items[i - 1] === delimiters.column && // DAN
+          //     equalities.includes(items[i].ends[R].ctrlSeq)) {
+          //   addCell();
+          // }
+        } else {
+          addCell();
+          if (items[i] === delimiters.column) {
+            if (items[i+1] !== delimiters.row) {
+              blocks.push(items[++i]);
+            }
+            else {
+              blocks.push(0);
+            }
+            addCell();
+          }
+          else 
+          if (items[i] === delimiters.row) row+=1;
+        }
+      }
+      addCell();
+      self.autocorrect();
+      return Parser.succeed(self);
+    });
+  };
+});
+
 // Replacement for mathblocks inside matrix cells
 // Adds matrix-specific keyboard commands
 var MatrixCell = P(MathBlock, function(_, super_) {
+  _.init = function(row, parent, replaces) {
+    super_.init.call(this);
+    this.row = row;
+    if (parent) {
+      this.adopt(parent, parent.ends[R], 0);
+    }
+    if (replaces) {
+      for (var i=0; i<replaces.length; i++) {
+        replaces[i].children().adopt(this, this.ends[R], 0);
+      }
+    }
+  };
+  _.keystroke = function(key, e, ctrlr) {
+    switch (key) {
+    case 'Shift-Spacebar':
+      e.preventDefault();
+      return this.parent.insert('addColumn', this);
+      break;
+    case 'Shift-Enter':
+    return this.parent.insert('addRow', this);
+      break;
+    }
+    return super_.keystroke.apply(this, arguments);
+  };
+  _.deleteOutOf = function(dir, cursor) {
+    var self = this, args = arguments;
+    this.parent.backspace(this, dir, cursor, function () {
+      // called when last cell gets deleted
+      return super_.deleteOutOf.apply(self, args);
+    });
+  }
+});
+
+var AlignedCell = P(MathBlock, function(_, super_) {
   _.init = function(row, parent, replaces) {
     super_.init.call(this);
     this.row = row;
