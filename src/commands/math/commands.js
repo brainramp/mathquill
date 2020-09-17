@@ -1112,8 +1112,13 @@ Environments.matrix = P(Environment, function(_, super_) {
         shortfall = maxLength - rows[i].length;
         while (shortfall) {
           position = maxLength*i + rows[i].length;
-          blocks.splice(position, 0, 
-            (this.matrixType == MatrixTypes.MATRIX ? MatrixCell(i, this) : AlignedCell(i, this)));
+          switch (this.matrixType) {
+            case MatrixTypes.MATRIX:
+              blocks.splice(position, 0, MatrixCell(i, this));
+              break;
+            case MatrixTypes.ALIGNED:
+              blocks.splice(position, 0, AlignedCell(i, this));
+          }
           shortfall-=1;
         }
       }
