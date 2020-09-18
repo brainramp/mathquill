@@ -1434,6 +1434,9 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
       cursor.insAtRightEnd(cell[R][R][R]);
       this.splitAcrossCells(nextLineWithEqualityFragment, cursor);
     }
+    else {
+      this.addAlignRow(cell, cursor);
+    }
   };
 
   _.fragmentArray = function(fragment) {
@@ -1457,7 +1460,7 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     }
     return items;
   };
-
+  // OLD: remove
   // converts a fragment into an aligned instance of the fragment
   // with equalities in the central column
   // TODO: have parser() call formulate()
@@ -1578,6 +1581,17 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     );
   };
 
+  _.addAlignRow = function(cell, cursor) {
+    var aligned = this;
+    aligned.insert('addRow', cell);
+    var newMiddleCell = aligned.blocks[(cell.row+1)*3+1];
+    cursor.insAtRightEnd(newMiddleCell[L]);
+    cursor.insAtRightEnd(newMiddleCell);
+    // todo: handle if prev was inequality
+    aligned.createToCell(LatexCmds['='](), newMiddleCell);
+    cursor.insAtRightEnd(newMiddleCell[R]);
+  };
+
   _.moveToCell = function(fragment, cell) {
     fragment.disown();
     fragment.adopt(cell, cell.ends[R], 0);
@@ -1657,17 +1671,18 @@ var AlignedCell = P(MathBlock, function(_, super_) {
       return this.parent.insert('addColumn', this);
       break;
     case 'Enter':
-      var aligned = this.parent;
-      var cursor = ctrlr.cursor;
-      aligned.insert('addRow', this);
-      var newMiddleCell = aligned.blocks[(this.row+1)*3+1];
-      cursor.insAtRightEnd(newMiddleCell[L]);
-      cursor.insAtRightEnd(newMiddleCell);
-      // todo: handle if prev was inequality
-      aligned.createToCell(LatexCmds['='](), newMiddleCell);
-      cursor.insAtRightEnd(newMiddleCell[R]);
+      return this.parent.addAlignRow(this, ctrlr.cursor);
+      // var aligned = this.parent;
+      // var cursor = ctrlr.cursor;
+      // aligned.insert('addRow', this);
+      // var newMiddleCell = aligned.blocks[(this.row+1)*3+1];
+      // cursor.insAtRightEnd(newMiddleCell[L]);
+      // cursor.insAtRightEnd(newMiddleCell);
+      // // todo: handle if prev was inequality
+      // aligned.createToCell(LatexCmds['='](), newMiddleCell);
+      // cursor.insAtRightEnd(newMiddleCell[R]);
 
-      return;
+      // return;
       break;
     case 'Shift-Enter':
     return this.parent.insert('addRow', this);
