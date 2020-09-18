@@ -533,16 +533,11 @@ var RootMathBlock = P(MathBlock, function(_, super_) { // DAN
     this.controller.handle('edit');
   };
   _.keystroke = function(key, e, ctrlr) {
-    if (key === 'Enter') { // create aligned environment
+    if (key === 'Enter') { // create aligned environment\
+      if (this.ends[R] === 0) return; // temp hack fix
       let cursor = this.cursor;
       let aligned = Aligned();
-      // console.log("aligned.formulate");
-      // console.log(aligned.formulate);
-      // console.log("aligned.itemizeFragment");
-      // console.log(aligned.itemizeFragment);
-      //console.log(aligned);
       let prevChildren = this.children();
-      //return;
       //prevChildren.remove();
       cursor.insAtRightEnd(this);
       aligned.createLeftOf(cursor);
@@ -554,7 +549,6 @@ var RootMathBlock = P(MathBlock, function(_, super_) { // DAN
       // aligned.moveToCell(Fragment(prevChildren.ends[L][R], prevChildren.ends[R]), aligned.blocks[1], 0);
      
       //aligned.splitAcrossCells(prevChildren, aligned.blocks[0]);
-
       
       // 
       // console.log("aligned.itemizeFragment(prevChildren)");
@@ -566,93 +560,6 @@ var RootMathBlock = P(MathBlock, function(_, super_) { // DAN
       // console.log("aligned");
       // console.log(aligned);
 
-      return;
-
-
-
-      
-
-      var self = aligned;
-      console.log("hereeee");
-
-
-
-
-      var fragment = prevChildren;
-      var items = [];
-      var currentNode = fragment.ends[L];
-      var nextNode = currentNode[R];
-  
-      while(currentNode !== 0) {
-        if (equalities.includes(currentNode.ctrlSeq)) {
-          items.push(delimiters.column);
-        }
-        items.push(currentNode);
-        currentNode = nextNode;
-        nextNode = nextNode[R];
-      }
-
-
-
-
-
-      console.log("items");
-      console.log(items);
-      var blocks = [];
-      var row = 0;
-      self.blocks = [];
-  
-      function addCell() {
-        console.log("adding block to cell, block:");
-        console.log(blocks);
-        self.blocks.push(AlignedCell(row, self, blocks));
-        blocks = [];
-      }
-  
-      let delimiterFound = false;
-      rowsWithEquals = [false];
-      for (var i=0; i<items.length; i+=1) {
-        if (items[i] instanceof MathBlock) {
-          blocks.push(items[i]);
-        } 
-        else {
-          if (blocks.length === 0) blocks = 0; // eh
-          addCell();
-          if (items[i] === delimiters.column) {
-            if (delimiterFound) {
-              throw new Error(
-                "Invalid aligned latex: Cannot contain multiple delimiters per row");
-            }
-            if (self.equalities.includes(items[i+1].ends[R].ctrlSeq)) {
-              blocks.push(items[++i]);
-              rowsWithEquals[row] = true;
-              delimiterFound = true;
-            }
-            else {
-              throw new Error(
-                "Invalid aligned latex: Must always delimit with &<equality>");
-            }
-            addCell();
-          }
-          else if (items[i] === delimiters.row) {
-            delimiterFound = false;
-            rowsWithEquals.push(false);
-            row++;
-          }
-        }
-      }
-      addCell();
-
-
-
-      console.log("aligned");
-      console.log(aligned);
-
-      //aligned.formulate(prevChildren.ends[L])
-
-      //cursor.insAtRightEnd(aligned.blocks[aligned.blocks.length/2]);
-    
-      
       return;
     }
     if (ctrlr.options.spaceBehavesLikeTab

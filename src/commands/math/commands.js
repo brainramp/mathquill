@@ -1206,7 +1206,13 @@ Environments.matrix = P(Environment, function(_, super_) {
 
     // Add new cells, one for each column
     for (var i=0; i<columns; i+=1) {
-      block = MatrixCell(row+1);
+      switch (this.matrixType) {
+        case MatrixTypes.MATRIX:
+          block = MatrixCell(row+1);
+          break;
+        case MatrixTypes.ALIGNED:
+          block = AlignedCell(row+1);
+      }
       block.parent = this;
       newCells.push(block);
 
@@ -1234,7 +1240,14 @@ Environments.matrix = P(Environment, function(_, super_) {
 
     // Add new cells, one for each row
     for (var i=0; i<rows.length; i+=1) {
-      block = MatrixCell(i);
+      switch (this.matrixType) {
+        case MatrixTypes.MATRIX:
+          block = MatrixCell(i);
+          break;
+        case MatrixTypes.ALIGNED:
+          block = AlignedCell(i);
+      }
+      //block = MatrixCell(i);
       block.parent = this;
       newCells.push(block);
       rows[i].splice(column, 0, block);
@@ -1321,7 +1334,7 @@ Environments.Vmatrix = P(Matrix, function(_, super_) {
 
 var Aligned = // DAN
 Environments['aligned'] = P(Matrix, function (_, super_) {
-  _.matrixType = MatrixTypes.MATRIX;
+  _.matrixType = MatrixTypes.ALIGNED;
   var delimiters = {
     column: '&',
     row: '\\\\'
@@ -1392,9 +1405,12 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
       if (equalities.includes(currentNode.ctrlSeq)) {
         if (noEqualities) {
           noEqualities = false;
-          thirdColFragment = Fragment(currentNode[R], currentNode.parent.ends[R]);
+          if (currentNode[R] !== 0) { // edge case for ending '='
+            thirdColFragment = Fragment(currentNode[R], currentNode.parent.ends[R]);
+          }
           this.moveToCell(currentNode, cell[R]);
           cursor.insAtRightEnd(cell[R]);
+
         }
         else { // found another equality
           nextLineWithEqualityFragment = Fragment(currentNode, thirdColFragment.ends[R]);
@@ -1418,35 +1434,6 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
       cursor.insAtRightEnd(cell[R][R][R]);
       this.splitAcrossCells(nextLineWithEqualityFragment, cursor);
     }
-
-
-    // while(currentNode !== 0) {
-    //   if (equalities.includes(currentNode.ctrlSeq)) {
-    //     if (noEqualities) {
-    //       noEqualities = false;
-    //       this.moveToCell(currentNode, cell[R]);
-    //       cursor.insAtRightEnd(cell[R]);
-    //     }
-    //     else {
-    //       //todo
-    //     }
-    //     currentFragment = 0;
-    //   }
-    //   else if (!noEqualities) {
-    //     if (currentFragment !== 0) {
-    //       currentFragment = Fragment(currentFragment.ends[L], currentNode);
-    //     }
-    //     else {
-    //       currentFragment = Fragment(currentNode, currentNode);
-    //     }
-
-    //   }
-      
-    //   currentNode = nextNode;
-    //   nextNode = nextNode[R];
-    // }
-    
-    // this.parent.insert('addRow', this);
   };
 
   _.fragmentArray = function(fragment) {
@@ -1485,15 +1472,11 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     var self = this;
     // console.log("hereeee");
     // var items = self.itemizeFragment(fragment);
-    console.log("items");
-    console.log(items);
     var blocks = [];
     var row = 0;
     self.blocks = [];
 
     function addCell() {
-      console.log("adding block to cell, block:");
-      console.log(blocks);
       self.blocks.push(AlignedCell(row, self, blocks));
       blocks = [];
     }
@@ -1609,8 +1592,13 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     //   fragment.jQ.appendTo(cell.jQ);
     // }
   };
+  _.createToCell = function(node, cell) {
+    node.adopt(cell, cell.ends[R], 0);
+    node.jQize().appendTo(cell.jQ);
+  };
   
 });
+
 
 // Replacement for mathblocks inside matrix cells
 // Adds matrix-specific keyboard commands
@@ -1654,8 +1642,6 @@ var AlignedCell = P(MathBlock, function(_, super_) {
     this.row = row;
     if (replaces === 0) return; // eh
     if (parent) {
-      console.log("parent");
-      console.log(parent);
       this.adopt(parent, parent.ends[R], 0);
     }
     if (replaces) {
@@ -1669,6 +1655,19 @@ var AlignedCell = P(MathBlock, function(_, super_) {
     case 'Shift-Spacebar':
       e.preventDefault();
       return this.parent.insert('addColumn', this);
+      break;
+    case 'Enter':
+      var aligned = this.parent;
+      var cursor = ctrlr.cursor;
+      aligned.insert('addRow', this);
+      var newMiddleCell = aligned.blocks[(this.row+1)*3+1];
+      cursor.insAtRightEnd(newMiddleCell[L]);
+      cursor.insAtRightEnd(newMiddleCell);
+      // todo: handle if prev was inequality
+      aligned.createToCell(LatexCmds['='](), newMiddleCell);
+      cursor.insAtRightEnd(newMiddleCell[R]);
+
+      return;
       break;
     case 'Shift-Enter':
     return this.parent.insert('addRow', this);
