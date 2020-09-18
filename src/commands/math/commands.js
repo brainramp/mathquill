@@ -1326,18 +1326,20 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     column: '&',
     row: '\\\\'
   };
+  _.delimiters = {
+    column: '&',
+    row: '\\\\'
+  };
   _.extraTableClasses = 'rcl';
   _.environment = 'aligned';
-  var equalities = ['=', '<', '>', '\\le ', '\\ge '] // DAN todo: add all equalities
+  var equalities = ['=', '<', '>', '\\le ', '\\ge ']; // DAN todo: add all equalities
+  _.equalities = ['=', '<', '>', '\\le ', '\\ge '];
+  var rowsWithEquals = [];
 
   // Don't delete empty columns, the align environment is for equations and should always have two columns.
   _.removeEmptyColumns = false;
   // For the same reason, don't allow adding columns.
   //_.addColumn = function() {};
-
-  // _.latex = function() {
-
-  // };
 
   _.latex = function() {
     var latex = '';
@@ -1365,12 +1367,172 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     this.blocks = [
       AlignedCell(0, this),
       AlignedCell(0, this),
-      AlignedCell(0, this),
-      AlignedCell(1, this),
-      AlignedCell(1, this),
-      AlignedCell(1, this)
+      AlignedCell(0, this)
+
+      //AlignedCell(0, this),
+      // AlignedCell(1, this)
+      // AlignedCell(1, this),
+      // AlignedCell(1, this),
+      // AlignedCell(1, this)
     ];
+    // rowsWithEquals.push(false);
+    // rowsWithEquals.push(false);
   };
+
+  _.splitAcrossCells = function(fragment, cursor) {
+    var currentNode = fragment.ends[L];
+    var cell = currentNode.parent;
+    var currentRow = cell.row;
+    var nextNode = currentNode[R];
+    var thirdColFragment = 0;
+    var nextLineWithEqualityFragment = 0;
+    var noEqualities = true;
+
+    while(currentNode !== 0) {
+      if (equalities.includes(currentNode.ctrlSeq)) {
+        if (noEqualities) {
+          noEqualities = false;
+          thirdColFragment = Fragment(currentNode[R], currentNode.parent.ends[R]);
+          this.moveToCell(currentNode, cell[R]);
+          cursor.insAtRightEnd(cell[R]);
+        }
+        else { // found another equality
+          nextLineWithEqualityFragment = Fragment(currentNode, thirdColFragment.ends[R]);
+          if (currentNode === thirdColFragment.ends[L]) {
+            thirdColFragment = 0;
+          }
+          break;
+        }
+      }
+      currentNode = nextNode;
+      nextNode = nextNode[R];
+    }
+
+    if (thirdColFragment !==  0) {
+      this.moveToCell(thirdColFragment, cell[R][R]);
+      cursor.insAtRightEnd(cell[R][R]);
+    }
+    if (nextLineWithEqualityFragment !==  0) {
+      this.insert('addRow', cell[R][R]);
+      this.moveToCell(nextLineWithEqualityFragment, cell[R][R][R]);
+      cursor.insAtRightEnd(cell[R][R][R]);
+      this.splitAcrossCells(nextLineWithEqualityFragment, cursor);
+    }
+
+
+    // while(currentNode !== 0) {
+    //   if (equalities.includes(currentNode.ctrlSeq)) {
+    //     if (noEqualities) {
+    //       noEqualities = false;
+    //       this.moveToCell(currentNode, cell[R]);
+    //       cursor.insAtRightEnd(cell[R]);
+    //     }
+    //     else {
+    //       //todo
+    //     }
+    //     currentFragment = 0;
+    //   }
+    //   else if (!noEqualities) {
+    //     if (currentFragment !== 0) {
+    //       currentFragment = Fragment(currentFragment.ends[L], currentNode);
+    //     }
+    //     else {
+    //       currentFragment = Fragment(currentNode, currentNode);
+    //     }
+
+    //   }
+      
+    //   currentNode = nextNode;
+    //   nextNode = nextNode[R];
+    // }
+    
+    // this.parent.insert('addRow', this);
+  };
+
+  _.fragmentArray = function(fragment) {
+
+  };
+
+  // itemizes a fragment into the form required for formulate
+  // i.e. an array with delimiter nodes replaced with char versions
+  _.itemizeFragment = function(fragment) {
+    var items = [];
+    var currentNode = fragment.ends[L];
+    var nextNode = currentNode[R];
+
+    while(currentNode !== 0) {
+      if (equalities.includes(currentNode.ctrlSeq)) {
+        items.push(delimiters.column);
+      }
+      items.push(currentNode);
+      currentNode = nextNode;
+      nextNode = nextNode[R];
+    }
+    return items;
+  };
+
+  // converts a fragment into an aligned instance of the fragment
+  // with equalities in the central column
+  // TODO: have parser() call formulate()
+  // this function is mostly copied in from parser() - 
+  // however, i was unable to get parser to successfully
+  // call formulate from within .then()
+  _.formulate = function(parent, items) {
+    console.log("aligned === parent");
+    console.log(this === parent);
+    // console.log(this);
+    // console.log(this);
+    var self = this;
+    // console.log("hereeee");
+    // var items = self.itemizeFragment(fragment);
+    console.log("items");
+    console.log(items);
+    var blocks = [];
+    var row = 0;
+    self.blocks = [];
+
+    function addCell() {
+      console.log("adding block to cell, block:");
+      console.log(blocks);
+      self.blocks.push(AlignedCell(row, self, blocks));
+      blocks = [];
+    }
+
+    let delimiterFound = false;
+    rowsWithEquals = [false];
+    for (var i=0; i<items.length; i+=1) {
+      if (items[i] instanceof MathBlock) {
+        blocks.push(items[i]);
+      } 
+      else {
+        if (blocks.length === 0) blocks = 0; // eh
+        addCell();
+        if (items[i] === delimiters.column) {
+          if (delimiterFound) {
+            throw new Error(
+              "Invalid aligned latex: Cannot contain multiple delimiters per row");
+          }
+          if (equalities.includes(items[i+1].ends[R].ctrlSeq)) {
+            blocks.push(items[++i]);
+            rowsWithEquals[row] = true;
+            delimiterFound = true;
+          }
+          else {
+            throw new Error(
+              "Invalid aligned latex: Must always delimit with &<equality>");
+          }
+          addCell();
+        }
+        else if (items[i] === delimiters.row) {
+          delimiterFound = false;
+          rowsWithEquals.push(false);
+          row++;
+        }
+      }
+    }
+    addCell();
+    // self.autocorrect(); // probably dont still need this
+  };//.bind(this);
 
   _.parser = function() {
     var self = this;
@@ -1378,48 +1540,76 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     var string = Parser.string;
 
     return optWhitespace
-    .then(string(delimiters.column)
-      .or(string(delimiters.row))
+    .then(string(/*this.*/delimiters.column)
+      .or(string(/*this.*/delimiters.row))
       .or(latexMathParser.block))
     .many()
     .skip(optWhitespace)
-    .then(function(items) {
-      var blocks = [];
-      var row = 0;
-      self.blocks = [];
+    .then(
+      function(items) {
+        var blocks = [];
+        var row = 0;
+        self.blocks = [];
 
-      function addCell() {
-        self.blocks.push(AlignedCell(row, self, blocks));
-        blocks = [];
-      }
-
-      for (var i=0; i<items.length; i+=1) {
-        if (items[i] instanceof MathBlock) {
-          blocks.push(items[i]);
-          // if (items[i - 1] === delimiters.column && // DAN
-          //     equalities.includes(items[i].ends[R].ctrlSeq)) {
-          //   addCell();
-          // }
-        } else {
-          addCell();
-          if (items[i] === delimiters.column) {
-            if (items[i+1] !== delimiters.row) {
-              blocks.push(items[++i]);
-            }
-            else {
-              blocks.push(0);
-            }
-            addCell();
-          }
-          else 
-          if (items[i] === delimiters.row) row+=1;
+        function addCell() {
+          self.blocks.push(AlignedCell(row, self, blocks));
+          blocks = [];
         }
-      }
-      addCell();
-      self.autocorrect();
-      return Parser.succeed(self);
-    });
+
+        let delimiterFound = false;
+        rowsWithEquals = [false];
+        for (var i=0; i<items.length; i+=1) {
+          if (items[i] instanceof MathBlock) {
+            blocks.push(items[i]);
+          } 
+          else {
+            if (blocks.length === 0) blocks = 0; // eh
+            addCell();
+            if (items[i] === delimiters.column) {
+              if (delimiterFound) {
+                throw new Error(
+                  "Invalid aligned latex: Cannot contain multiple delimiters per row");
+              }
+              if (equalities.includes(items[i+1].ends[R].ctrlSeq)) {
+                blocks.push(items[++i]);
+                rowsWithEquals[row] = true;
+                delimiterFound = true;
+              }
+              else {
+                throw new Error(
+                  "Invalid aligned latex: Must always delimit with &<equality>");
+              }
+              addCell();
+            }
+            else if (items[i] === delimiters.row) {
+              delimiterFound = false;
+              rowsWithEquals.push(false);
+              row++;
+            }
+          }
+        }
+        addCell();
+        // self.autocorrect(); // probably dont still need this
+        return Parser.succeed(self);
+      }.bind(this)
+    );
   };
+
+  _.moveToCell = function(fragment, cell) {
+    fragment.disown();
+    fragment.adopt(cell, cell.ends[R], 0);
+    fragment.jQ.appendTo(cell.jQ);
+    // if (!cell) {
+    //   let newRow = (typeof row != 'undefined') ? row : this.ends[R].row;
+    //   this.blocks.push(AlignedCell(newRow, this, fragment));
+    //   // needs testing
+    // }
+    // else {
+    //   fragment.adopt(cell, 0, 0);
+    //   fragment.jQ.appendTo(cell.jQ);
+    // }
+  };
+  
 });
 
 // Replacement for mathblocks inside matrix cells
@@ -1462,7 +1652,10 @@ var AlignedCell = P(MathBlock, function(_, super_) {
   _.init = function(row, parent, replaces) {
     super_.init.call(this);
     this.row = row;
+    if (replaces === 0) return; // eh
     if (parent) {
+      console.log("parent");
+      console.log(parent);
       this.adopt(parent, parent.ends[R], 0);
     }
     if (replaces) {

@@ -521,7 +521,150 @@ API.StaticMath = function(APIClasses) {
   });
 };
 
-var RootMathBlock = P(MathBlock, RootBlockMixin);
+//var RootMathBlock = P(MathBlock, RootBlockMixin);
+var RootMathBlock = P(MathBlock, function(_, super_) { // DAN
+  var names = 'moveOutOf deleteOutOf selectOutOf upOutOf downOutOf'.split(' ');
+  for (var i = 0; i < names.length; i += 1) (function(name) {
+    _[name] = function(dir) { this.controller.handle(name, dir); };
+  }(names[i]));
+  _.reflow = function() {
+    this.controller.handle('reflow');
+    this.controller.handle('edited');
+    this.controller.handle('edit');
+  };
+  _.keystroke = function(key, e, ctrlr) {
+    if (key === 'Enter') { // create aligned environment
+      let cursor = this.cursor;
+      let aligned = Aligned();
+      // console.log("aligned.formulate");
+      // console.log(aligned.formulate);
+      // console.log("aligned.itemizeFragment");
+      // console.log(aligned.itemizeFragment);
+      //console.log(aligned);
+      let prevChildren = this.children();
+      //return;
+      //prevChildren.remove();
+      cursor.insAtRightEnd(this);
+      aligned.createLeftOf(cursor);
+
+      aligned.moveToCell(prevChildren, aligned.blocks[0], 0);
+      aligned.splitAcrossCells(prevChildren, cursor);
+      //cursor.insAtRightEnd(aligned.blocks[aligned.blocks.length/2]);
+      // aligned.moveToCell(Fragment(prevChildren.ends[L][R], prevChildren.ends[R]), aligned.blocks[1], 0);
+      // aligned.moveToCell(Fragment(prevChildren.ends[L][R], prevChildren.ends[R]), aligned.blocks[1], 0);
+     
+      //aligned.splitAcrossCells(prevChildren, aligned.blocks[0]);
+
+      
+      // 
+      // console.log("aligned.itemizeFragment(prevChildren)");
+      // console.log(aligned.itemizeFragment(prevChildren));
+      // aligned.formulate(prevChildren);
+
+
+      //aligned.formulate(aligned, aligned.itemizeFragment(prevChildren));
+      // console.log("aligned");
+      // console.log(aligned);
+
+      return;
+
+
+
+      
+
+      var self = aligned;
+      console.log("hereeee");
+
+
+
+
+      var fragment = prevChildren;
+      var items = [];
+      var currentNode = fragment.ends[L];
+      var nextNode = currentNode[R];
+  
+      while(currentNode !== 0) {
+        if (equalities.includes(currentNode.ctrlSeq)) {
+          items.push(delimiters.column);
+        }
+        items.push(currentNode);
+        currentNode = nextNode;
+        nextNode = nextNode[R];
+      }
+
+
+
+
+
+      console.log("items");
+      console.log(items);
+      var blocks = [];
+      var row = 0;
+      self.blocks = [];
+  
+      function addCell() {
+        console.log("adding block to cell, block:");
+        console.log(blocks);
+        self.blocks.push(AlignedCell(row, self, blocks));
+        blocks = [];
+      }
+  
+      let delimiterFound = false;
+      rowsWithEquals = [false];
+      for (var i=0; i<items.length; i+=1) {
+        if (items[i] instanceof MathBlock) {
+          blocks.push(items[i]);
+        } 
+        else {
+          if (blocks.length === 0) blocks = 0; // eh
+          addCell();
+          if (items[i] === delimiters.column) {
+            if (delimiterFound) {
+              throw new Error(
+                "Invalid aligned latex: Cannot contain multiple delimiters per row");
+            }
+            if (self.equalities.includes(items[i+1].ends[R].ctrlSeq)) {
+              blocks.push(items[++i]);
+              rowsWithEquals[row] = true;
+              delimiterFound = true;
+            }
+            else {
+              throw new Error(
+                "Invalid aligned latex: Must always delimit with &<equality>");
+            }
+            addCell();
+          }
+          else if (items[i] === delimiters.row) {
+            delimiterFound = false;
+            rowsWithEquals.push(false);
+            row++;
+          }
+        }
+      }
+      addCell();
+
+
+
+      console.log("aligned");
+      console.log(aligned);
+
+      //aligned.formulate(prevChildren.ends[L])
+
+      //cursor.insAtRightEnd(aligned.blocks[aligned.blocks.length/2]);
+    
+      
+      return;
+    }
+    if (ctrlr.options.spaceBehavesLikeTab
+        && (key === 'Spacebar' || key === 'Shift-Spacebar')) {
+      e.preventDefault();
+      ctrlr.escapeDir(key === 'Shift-Spacebar' ? L : R, key, e);
+      return;
+    }
+    return super_.keystroke.apply(this, arguments);
+  };
+});
+
 API.MathField = function(APIClasses) {
   return P(APIClasses.EditableField, function(_, super_) {
     this.RootBlock = RootMathBlock;
