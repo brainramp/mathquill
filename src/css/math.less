@@ -417,7 +417,7 @@
     }
   }
 
-  .mq-matrix {
+  .mq-matrix, .mq-aligned{
     vertical-align: middle;
     margin-left: 0.1em;
     margin-right: 0.1em;
@@ -443,12 +443,24 @@
           text-align: left;
         }
       }
+
+      &.aligned td.mq-empty {
+        background: transparent;
+      }
+      
+      // &.aligned {
+      //   td {
+      //     &.mq-empty {
+      //       background: transparent;
+      //     }
+      //   }
+      // }
     }
 
     td {
       border: none;
       width: auto; /* defensive resets */
-      padding: 0.1em 0.3em;
+      padding: 0.1em 0.1em;
       vertical-align: baseline;
     }
   }

@@ -934,6 +934,8 @@ Environments.matrix = P(Environment, function(_, super_) {
     right: null
   };
   _.environment = 'matrix';
+  _.removeEmptyColumns = true;
+  _.removeEmptyRows = true;
 
   _.reflow = function() {
     var blockjQ = this.jQ.children('table');
@@ -1167,7 +1169,7 @@ Environments.matrix = P(Environment, function(_, super_) {
       }
     }
 
-    if (isEmpty(myRow) && myColumn.length > 1) {
+    if (this.removeEmptyRows && isEmpty(myRow) && myColumn.length > 1) {
       row = rows.indexOf(myRow);
       // Decrease all following row numbers
       this.eachChild(function (cell) {
@@ -1177,9 +1179,10 @@ Environments.matrix = P(Environment, function(_, super_) {
       remove(myRow);
       this.jQ.find('tr').eq(row).remove();
     }
-    if (isEmpty(myColumn) && myRow.length > 1) {
+    if (this.removeEmptyColumns && isEmpty(myColumn) && myRow.length > 1) {
       remove(myColumn);
     }
+    
     this.finalizeTree();
   };
   _.addRow = function(afterCell) {
@@ -1343,7 +1346,7 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     column: '&',
     row: '\\\\'
   };
-  _.extraTableClasses = 'rcl';
+  _.extraTableClasses = 'rcl aligned';
   _.environment = 'aligned';
   var equalities = ['=', '<', '>', '\\le ', '\\ge ']; // DAN todo: add all equalities
   _.equalities = ['=', '<', '>', '\\le ', '\\ge '];
@@ -1351,6 +1354,7 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
 
   // Don't delete empty columns, the align environment is for equations and should always have two columns.
   _.removeEmptyColumns = false;
+  _.removeEmptyRows = true;
   // For the same reason, don't allow adding columns.
   //_.addColumn = function() {};
 
@@ -1392,10 +1396,10 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     // rowsWithEquals.push(false);
   };
 
-  _.splitAcrossCells = function(fragment, cursor) {
+  // only works if calling on left-most cell in row
+  _.splitAcrossCells = function(fragment, cursor, avoidExtraRow) {
     var currentNode = fragment.ends[L];
     var cell = currentNode.parent;
-    var currentRow = cell.row;
     var nextNode = currentNode[R];
     var thirdColFragment = 0;
     var nextLineWithEqualityFragment = 0;
@@ -1432,34 +1436,33 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
       this.insert('addRow', cell[R][R]);
       this.moveToCell(nextLineWithEqualityFragment, cell[R][R][R]);
       cursor.insAtRightEnd(cell[R][R][R]);
-      this.splitAcrossCells(nextLineWithEqualityFragment, cursor);
+      this.splitAcrossCells(nextLineWithEqualityFragment, cursor, true);
     }
-    else {
+    else if (!avoidExtraRow) {
       this.addAlignRow(cell, cursor);
     }
-  };
 
-  _.fragmentArray = function(fragment) {
-
+    // this.autocorrect(); // dont think these do anything because insert addrow does already
+    // this.finalizeTree();
   };
 
   // itemizes a fragment into the form required for formulate
   // i.e. an array with delimiter nodes replaced with char versions
-  _.itemizeFragment = function(fragment) {
-    var items = [];
-    var currentNode = fragment.ends[L];
-    var nextNode = currentNode[R];
+  // _.itemizeFragment = function(fragment) {
+  //   var items = [];
+  //   var currentNode = fragment.ends[L];
+  //   var nextNode = currentNode[R];
 
-    while(currentNode !== 0) {
-      if (equalities.includes(currentNode.ctrlSeq)) {
-        items.push(delimiters.column);
-      }
-      items.push(currentNode);
-      currentNode = nextNode;
-      nextNode = nextNode[R];
-    }
-    return items;
-  };
+  //   while(currentNode !== 0) {
+  //     if (equalities.includes(currentNode.ctrlSeq)) {
+  //       items.push(delimiters.column);
+  //     }
+  //     items.push(currentNode);
+  //     currentNode = nextNode;
+  //     nextNode = nextNode[R];
+  //   }
+  //   return items;
+  // };
   // OLD: remove
   // converts a fragment into an aligned instance of the fragment
   // with equalities in the central column
@@ -1467,60 +1470,229 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
   // this function is mostly copied in from parser() - 
   // however, i was unable to get parser to successfully
   // call formulate from within .then()
-  _.formulate = function(parent, items) {
-    console.log("aligned === parent");
-    console.log(this === parent);
-    // console.log(this);
-    // console.log(this);
-    var self = this;
-    // console.log("hereeee");
-    // var items = self.itemizeFragment(fragment);
-    var blocks = [];
-    var row = 0;
-    self.blocks = [];
+  // _.formulate = function(parent, items) {
+  //   console.log("aligned === parent");
+  //   console.log(this === parent);
+  //   // console.log(this);
+  //   // console.log(this);
+  //   var self = this;
+  //   // console.log("hereeee");
+  //   // var items = self.itemizeFragment(fragment);
+  //   var blocks = [];
+  //   var row = 0;
+  //   self.blocks = [];
 
-    function addCell() {
-      self.blocks.push(AlignedCell(row, self, blocks));
-      blocks = [];
-    }
+  //   function addCell() {
+  //     self.blocks.push(AlignedCell(row, self, blocks));
+  //     blocks = [];
+  //   }
 
-    let delimiterFound = false;
-    rowsWithEquals = [false];
-    for (var i=0; i<items.length; i+=1) {
-      if (items[i] instanceof MathBlock) {
-        blocks.push(items[i]);
-      } 
-      else {
-        if (blocks.length === 0) blocks = 0; // eh
-        addCell();
-        if (items[i] === delimiters.column) {
-          if (delimiterFound) {
-            throw new Error(
-              "Invalid aligned latex: Cannot contain multiple delimiters per row");
-          }
-          if (equalities.includes(items[i+1].ends[R].ctrlSeq)) {
-            blocks.push(items[++i]);
-            rowsWithEquals[row] = true;
-            delimiterFound = true;
-          }
-          else {
-            throw new Error(
-              "Invalid aligned latex: Must always delimit with &<equality>");
-          }
-          addCell();
-        }
-        else if (items[i] === delimiters.row) {
-          delimiterFound = false;
-          rowsWithEquals.push(false);
-          row++;
-        }
-      }
-    }
-    addCell();
+  //   let delimiterFound = false;
+  //   rowsWithEquals = [false];
+  //   for (var i=0; i<items.length; i+=1) {
+  //     if (items[i] instanceof MathBlock) {
+  //       blocks.push(items[i]);
+  //     } 
+  //     else {
+  //       if (blocks.length === 0) blocks = 0; // eh
+  //       addCell();
+  //       if (items[i] === delimiters.column) {
+  //         if (delimiterFound) {
+  //           throw new Error(
+  //             "Invalid aligned latex: Cannot contain multiple delimiters per row");
+  //         }
+  //         if (equalities.includes(items[i+1].ends[R].ctrlSeq)) {
+  //           blocks.push(items[++i]);
+  //           rowsWithEquals[row] = true;
+  //           delimiterFound = true;
+  //         }
+  //         else {
+  //           throw new Error(
+  //             "Invalid aligned latex: Must always delimit with &<equality>");
+  //         }
+  //         addCell();
+  //       }
+  //       else if (items[i] === delimiters.row) {
+  //         delimiterFound = false;
+  //         rowsWithEquals.push(false);
+  //         row++;
+  //       }
+  //     }
+  //   }
+  //   addCell();
     // self.autocorrect(); // probably dont still need this
-  };//.bind(this);
+  // };//.bind(this);
 
-  _.parser = function() {
+  
+  _.html = function() {
+    var cells = [], trs = '', i=0, row;
+
+    function parenHtml(paren) {
+      return (paren) ?
+          '<span class="mq-scaled mq-paren">'
+        +   paren
+        + '</span>' : '';
+    }
+
+    // Build <tr><td>.. structure from cells
+    this.eachChild(function (cell) {
+      var isFirstColumn = row !== cell.row;
+      if (isFirstColumn) {
+        row = cell.row;
+        trs += '<tr>$tds</tr>';
+        cells[row] = [];
+      }
+      if (this.parent.htmlColumnSeparator && !isFirstColumn) {
+        cells[row].push(this.parent.htmlColumnSeparator);
+      }
+      cells[row].push('<td>&'+(i++)+'</td>');
+    });
+
+    var tableClasses = this.extraTableClasses ? 'mq-non-leaf ' + this.extraTableClasses : 'mq-non-leaf';
+
+    this.htmlTemplate =
+        '<span class="mq-aligned mq-non-leaf">'
+      +   parenHtml(this.parentheses.left)
+      +   '<table class="' + tableClasses + '">'
+      +     trs.replace(/\$tds/g, function () {
+              return cells.shift().join('');
+            })
+      +   '</table>'
+      +   parenHtml(this.parentheses.right)
+      + '</span>'
+    ;
+
+    return super_.html.call(this);
+  };
+
+
+
+  // _.parser = function() {
+  //   var self = this;
+  //   var optWhitespace = Parser.optWhitespace;
+  //   var string = Parser.string;
+
+  //   return optWhitespace
+  //   .then(string(/*this.*/delimiters.column)
+  //     .or(string(/*this.*/delimiters.row))
+  //     .or(latexMathParser.block))
+  //   .many()
+  //   .skip(optWhitespace)
+  //   .then(
+  //     function(items) {
+  //       self.blocks = [];
+  //       var itemArray = [];
+  //       var currentRow = 0;
+  //       var currentCellNum = 0;
+  //       var currentFragmentStart = 0;
+  //       var currentFragmentEnd = 0;
+  //       var colDelimFoundInRow = false;
+
+  //       function addRow() {
+  //         self.blocks.push(AlignedCell(currentRow, self));
+  //         self.blocks.push(AlignedCell(currentRow, self));
+  //         self.blocks.push(AlignedCell(currentRow, self));
+  //         currentCellNum = currentRow * 3;
+  //         currentRow++;
+  //         colDelimFoundInRow = false;
+  //         //currentFragment = 0;
+  //       }
+
+  //       function insertCell() {
+  //         if (itemArray.length === 0) {
+  //           currentCellNum++
+  //         }
+  //         else {
+  //           self.blocks[currentCellNum] = AlignedCell(currentRow, self, itemArray);
+  //           itemArray = [];
+  //         }
+  //       }
+
+  //       // function adoptToNextCell(fragment) {
+  //       //   if (fragment === 0) {
+  //       //     currentCellNum++
+  //       //     return;
+  //       //   }
+  //       //   if (fragment === currentFragmentEnd) {
+  //       //     console.log("currentFragmentStart");
+  //       //     console.log(currentFragmentStart);
+  //       //     console.log("currentFragmentEnd");
+  //       //     console.log(currentFragmentEnd);
+
+  //       //     fragment = Fragment(currentFragmentStart, currentFragmentEnd);
+  //       //     currentFragmentStart = 0;
+  //       //     currentFragmentEnd = 0;
+  //       //   }
+  //       //   fragment.adopt(self.blocks[currentCellNum], self.blocks[currentCellNum].ends[R], 0);
+  //       //   currentCellNum++
+  //       // }
+
+  //       // function appendToCurrentFragment(item) {
+  //       //   if (currentFragmentStart === 0) {
+  //       //     currentFragmentStart = item;
+  //       //     currentFragmentEnd = item;
+  //       //   }
+  //       //   else {
+  //       //     currentFragmentEnd = item;
+  //       //   }
+  //         //   console.log("appending item: ")
+  //         //   console.log(item)
+  //         //   console.log("appending to: ")
+  //         //   console.log(currentFragment);
+  //         //   console.log("currentFragment.ends[L].ends[L]");
+  //         //   console.log(currentFragment.ends[L].ends[L]);
+  //         //   console.log("currentFragment.ends[L].parent === item.parent");
+  //         //   console.log(currentFragment.ends[L].parent === item.parent);
+  //         //   pray('withDir and oppDir have the same parent',
+  //         //      currentFragment.ends[L] === oppDir.parent);
+  //         //   currentFragment = Fragment(currentFragment.ends[L], item);
+  //         //   console.log("got here");
+  //         // }
+  //      // }
+
+  //       addRow();
+  //       for (var i=0; i<items.length; i+=1) {
+  //         if (items[i] instanceof MathBlock) {
+  //           //appendToCurrentFragment(items[i]);
+  //           itemArray.push(items[i]);
+  //         } 
+  //         else {
+  //           insertCell();
+  //           //adoptToNextCell(currentFragmentEnd);
+  //           if (items[i] === delimiters.column) {
+  //             if (colDelimFoundInRow) {
+  //               throw new Error(
+  //                 "Invalid aligned latex: Cannot contain multiple delimiters per row");
+  //             }
+  //             i++;
+  //             if (!equalities.includes(items[i].ends[R].ctrlSeq)) {
+  //               throw new Error(
+  //                 "Invalid aligned latex: Must always delimit with &<equality>");
+  //             }
+  //             else {
+  //               itemArray.push(items[i]);
+  //               insertCell();
+  //               //adoptToNextCell(items[i]);
+  //               colDelimFoundInRow = true;
+  //             }
+  //           }
+  //           else if (items[i] === delimiters.row) {
+  //             addRow();
+  //           }
+  //         }
+  //       }
+  //       insertCell();
+  //       //adoptToNextCell(currentFragmentEnd);
+  //       self.finalizeTree();
+  //       //self.autocorrect();
+  //       return Parser.succeed(self);
+  //     }.bind(this)
+  //   );
+  // };
+
+
+
+  _.parser = function() { // old
     var self = this;
     var optWhitespace = Parser.optWhitespace;
     var string = Parser.string;
@@ -1542,6 +1714,15 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
           blocks = [];
         }
 
+        // fill in existing row with empty squares
+        function fillRow() {
+          var blockNum = self.blocks.length;
+          for (var i = 0; i < ((row+1) * 3 - blockNum); i++) {
+            blocks = [];
+            addCell();
+          }
+        }
+
         let delimiterFound = false;
         rowsWithEquals = [false];
         for (var i=0; i<items.length; i+=1) {
@@ -1549,7 +1730,7 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
             blocks.push(items[i]);
           } 
           else {
-            if (blocks.length === 0) blocks = 0; // eh
+            if (blocks.length === 0) blocks = []; // eh
             addCell();
             if (items[i] === delimiters.column) {
               if (delimiterFound) {
@@ -1568,6 +1749,7 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
               addCell();
             }
             else if (items[i] === delimiters.row) {
+              fillRow();
               delimiterFound = false;
               rowsWithEquals.push(false);
               row++;
@@ -1575,6 +1757,9 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
           }
         }
         addCell();
+        fillRow();
+        
+        // self.finalizeTree();
         // self.autocorrect(); // probably dont still need this
         return Parser.succeed(self);
       }.bind(this)
@@ -1665,28 +1850,41 @@ var AlignedCell = P(MathBlock, function(_, super_) {
     }
   };
   _.keystroke = function(key, e, ctrlr) {
+    function goDirUntilFoundPos(dir, pos, currentCell) {
+      if (ctrlr.cursor[pos] !== 0 || !currentCell[dir] || 
+        (currentCell[dir] && currentCell.row !== currentCell[dir].row)) return;
+      super_.keystroke.apply(currentCell, [(dir === R ? 'Right' : 'Left'), e, ctrlr]);
+      currentCell = currentCell[dir];
+      goDirUntilFoundPos(dir, pos, currentCell);
+    }
     switch (key) {
-    case 'Shift-Spacebar':
-      e.preventDefault();
-      return this.parent.insert('addColumn', this);
-      break;
+    // case 'Shift-Spacebar': // dont want users to add new cols/rows manually
+    //   e.preventDefault();
+    //   return this.parent.insert('addColumn', this);
+    //   break;
+    // case 'Shift-Enter':
+    //   return this.parent.insert('addRow', this);
+    //   break;
     case 'Enter':
       return this.parent.addAlignRow(this, ctrlr.cursor);
-      // var aligned = this.parent;
-      // var cursor = ctrlr.cursor;
-      // aligned.insert('addRow', this);
-      // var newMiddleCell = aligned.blocks[(this.row+1)*3+1];
-      // cursor.insAtRightEnd(newMiddleCell[L]);
-      // cursor.insAtRightEnd(newMiddleCell);
-      // // todo: handle if prev was inequality
-      // aligned.createToCell(LatexCmds['='](), newMiddleCell);
-      // cursor.insAtRightEnd(newMiddleCell[R]);
-
-      // return;
       break;
-    case 'Shift-Enter':
-    return this.parent.insert('addRow', this);
-      break;
+    case 'Backspace':
+      super_.keystroke.apply(this, arguments);
+      //goLeftUntilSomethingFound(L, this);
+      goDirUntilFoundPos(L, L, this);
+      return;
+    case 'Del':
+      goDirUntilFoundPos(R, R, this);
+      super_.keystroke.apply(this, arguments);
+      return;
+    case 'Left':
+      super_.keystroke.apply(this, arguments);
+      goDirUntilFoundPos(L, L, this);
+      return;
+    case 'Right':
+      super_.keystroke.apply(this, arguments);
+      goDirUntilFoundPos(R, L, this);
+      return;
     }
     return super_.keystroke.apply(this, arguments);
   };
