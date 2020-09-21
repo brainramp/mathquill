@@ -132,7 +132,7 @@ Node.open(function(_) {
     default:
       return;
     }
-    e.preventDefault();
+    if (e) e.preventDefault();
     ctrlr.scrollHoriz();
   };
 
@@ -181,8 +181,9 @@ Controller.open(function(_) {
     }
     else if (cursor[dir]) cursor[dir].moveTowards(dir, cursor, updown);
     else cursor.parent.moveOutOf(dir, cursor, updown);
-
-    return this.notify('move');
+    this.notify('move');
+    if (cursor.parent.afterMove) cursor.parent.afterMove(this, dir);
+    return;// this.notify('move');
   };
   _.moveLeft = function() { return this.moveDir(L); };
   _.moveRight = function() { return this.moveDir(R); };
@@ -235,7 +236,14 @@ Controller.open(function(_) {
     if (cursor[L].siblingDeleted) cursor[L].siblingDeleted(cursor.options, R);
     if (cursor[R].siblingDeleted) cursor[R].siblingDeleted(cursor.options, L);
     cursor.parent.bubble('reflow');
-
+    // console.log("deleted, newleft:"); 
+    // console.log(cursor[L].ctrlSeq);
+    // DAN
+    // console.log("what is e:");
+    // console.log(e);
+    // throw new Error("pause here");
+    //return;
+    if (cursor.parent.afterDeletion) cursor.parent.afterDeletion(this, dir);
     return this;
   };
   _.ctrlDeleteDir = function(dir) {

@@ -25,6 +25,14 @@ var MathElement = P(Node, function(_, super_) {
     if (self[R].siblingCreated) self[R].siblingCreated(options, L);
     if (self[L].siblingCreated) self[L].siblingCreated(options, R);
     self.bubble('reflow');
+
+
+    if (self.parent instanceof AlignedCell) { // DAN
+    // console.log("insertion finalized");
+    // throw new Error("insertion finalized");
+    //   console.log("self.parent.ends[R].ctrlSeq");
+    //   console.log(self.parent.ends[R].ctrlSeq);
+    }
   };
   // If the maxDepth option is set, make sure
   // deeply nested content is truncated. Just return
@@ -86,6 +94,7 @@ var MathCommand = P(MathElement, function(_, super_) {
   };
   _.isEmpty = function() {
     return this.foldChildren(true, function(isEmpty, child) {
+      console.log("blahhhhhhh");
       return isEmpty && child.isEmpty();
     });
   };
@@ -120,6 +129,19 @@ var MathCommand = P(MathElement, function(_, super_) {
     }
     cmd.finalizeInsert(cursor.options);
     cmd.placeCursor(cursor);
+    // console.log("cmd");
+    // console.log(cmd);
+    console.log("cmd.parent instanceof AlignedCell");
+    console.log(cmd.parent instanceof AlignedCell);
+    // console.log("cmd.parent instanceof MathCommand");
+    // console.log(cmd.parent instanceof MathCommand);
+    // console.log("cmd.parent");
+    // console.log(cmd.parent);
+
+    console.log("cmd.parent");
+    console.log(cmd.parent);
+//DAN
+    //if(cmd.parent.afterInsertion) cmd.parent.afterInsertion(cursor);
   };
   _.createBlocks = function() {
     var cmd = this,
@@ -340,6 +362,39 @@ var Symbol = P(MathCommand, function(_, super_) {
   };
 
   _.parser = function() { return Parser.succeed(this); };
+  _.createLeftOf = function(cursor) {
+    var cmd = this;
+    var replacedFragment = cmd.replacedFragment;
+
+    cmd.createBlocks();
+    super_.createLeftOf.call(cmd, cursor);
+    if (replacedFragment) {
+      replacedFragment.adopt(cmd.ends[L], 0, 0);
+      replacedFragment.jQ.appendTo(cmd.ends[L].jQ);
+      cmd.placeCursor(cursor);
+      cmd.prepareInsertionAt(cursor);
+    }
+    cmd.finalizeInsert(cursor.options);
+    cmd.placeCursor(cursor);
+    // console.log("cmd");
+    // console.log(cmd);
+    console.log("cmd.parent instanceof AlignedCell");
+    console.log(cmd.parent instanceof AlignedCell);
+    // console.log("cmd.parent instanceof MathCommand");
+    // console.log(cmd.parent instanceof MathCommand);
+    // console.log("cmd.parent");
+    // console.log(cmd.parent);
+
+    console.log("cmd.parent");
+    console.log(cmd.parent);
+//DAN
+// thank fuck this worked
+// but fix this up so you aren't copy pasting code
+    console.log("cursor");
+    console.log(cursor);
+    //throw new Error("stop here please");
+    if(cmd.parent.afterInsertion) cmd.parent.afterInsertion(null, cursor);
+  };
   _.numBlocks = function() { return 0; };
 
   _.replaces = function(replacedFragment) {
