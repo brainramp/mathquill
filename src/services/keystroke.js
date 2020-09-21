@@ -243,7 +243,7 @@ Controller.open(function(_) {
     // console.log(e);
     // throw new Error("pause here");
     //return;
-    if (cursor.parent.afterDeletion) cursor.parent.afterDeletion(this, dir);
+    if (cursor.parent.afterDeletion) cursor.parent.afterDeletion(this);
     return this;
   };
   _.ctrlDeleteDir = function(dir) {

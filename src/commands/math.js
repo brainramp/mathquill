@@ -393,7 +393,7 @@ var Symbol = P(MathCommand, function(_, super_) {
     console.log("cursor");
     console.log(cursor);
     //throw new Error("stop here please");
-    if(cmd.parent.afterInsertion) cmd.parent.afterInsertion(null, cursor);
+    if(cmd.parent.afterInsertion) cmd.parent.afterInsertion(cursor);
   };
   _.numBlocks = function() { return 0; };
 
