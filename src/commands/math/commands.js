@@ -1169,20 +1169,7 @@ Environments.matrix = P(Environment, function(_, super_) {
       }
     }
 
-    // finalDeleteCallback();
-    // this.finalizeTree();
-    // if (!currentCell[L] && isEmpty(myRow)) { // DAN
-    //   cursor.insLeftOf(this);
-    //   remove(myRow);
-    //   this.remove();
-    //   return;
-    // }
-    if ((this.removeEmptyRows && isEmpty(myRow) && myColumn.length > 1) /*||
-        (this.removeEmptyRowsIfLeftmost && isEmpty(myRow) && 
-          (!this[L] || this.row !== this[L].row)))*/) {
-    // if ((this.removeEmptyRows || !currentCell[L] ||
-    //     (this.removeEmptyRowsIfLeftmost && currentCell.row !== currentCell[L].row)) && 
-    //     isEmpty(myRow) && myColumn.length > 1) {
+    if (this.removeEmptyRows && isEmpty(myRow) && myColumn.length > 1) {
       row = rows.indexOf(myRow);
       // Decrease all following row numbers
       this.eachChild(function (cell) {
@@ -1304,7 +1291,8 @@ Environments.matrix = P(Environment, function(_, super_) {
         this.finalizeTree();
       }
       // check if whole matrix empty, then delete it
-      if (this.removeEmptyRowsIfLeftmost && cell.row === 0) {
+      //if (this.removeEmptyRowsIfLeftmost && cell.row === 0) {
+      if (this.removeEmptyRows && cell.row === 0) {
         var allEmpty = true; // DAN
         for (var i = 0; i < this.blocks.length; i++) {
           if (!(this.blocks[i].isEmpty())) {
@@ -1316,26 +1304,24 @@ Environments.matrix = P(Environment, function(_, super_) {
           finalDeleteCallback();
           this.finalizeTree();
         }
-
-        // var currentCell = this.blocks[0];
-        // var rowNum = currentCell.rowNum;
-        // var rowEmpty = true; // DAN
-        // while (typeof currentCell !== 'undefined' && currentCell.row === rowNum) {
-        //   if (!(currentCell.isEmpty)) {
-        //     rowEmpty = false;
-        //     break;
-        //   }
-        //   currentCell = currentCell[R]
-        // }
-        // if (rowEmpty) {
-        //   // finalDeleteCallback();
-        //   // this.finalizeTree();
-        // }
       }
       
       this.bubble('edited');
     }
   };
+
+  _.rowIsEmpty = function(row) {
+    if (!this.blocks[row]) {
+      throw new OutOfBoundsError("rowIsEmpty(): invalid row number");
+    }
+    for (var i = row*3; i < (row+1)*3; i++) {
+      if (!this.blocks[i].isEmpty()) {
+        return false;
+      }
+    }
+    return true;
+  };
+
 });
 
 Environments.pmatrix = P(Matrix, function(_, super_) {
@@ -1399,8 +1385,6 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
   _.removeEmptyColumns = false;
   _.removeEmptyRows = true;
   _.removeEmptyRowsIfLeftmost = true;
-  // For the same reason, don't allow adding columns.
-  //_.addColumn = function() {};
 
   _.latex = function() {
     var latex = '';
@@ -1429,15 +1413,7 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
       AlignedCell(0, this),
       AlignedCell(0, this),
       AlignedCell(0, this)
-
-      //AlignedCell(0, this),
-      // AlignedCell(1, this)
-      // AlignedCell(1, this),
-      // AlignedCell(1, this),
-      // AlignedCell(1, this)
     ];
-    // rowsWithEquals.push(false);
-    // rowsWithEquals.push(false);
   };
 
   // only works if calling on left-most cell in row
@@ -1489,92 +1465,10 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
       this.splitAcrossCells(nextLineWithEqualityFragment, cursor, true);
     }
     else if (!avoidExtraRow) {
-      //this.addAlignRow(cell, cursor); //old, does nothing
       this.insert('addRow', cell);
       cursor.insAtLeftEnd(this.blocks[(cell.row+1)*3]);
     }
-
-    // this.autocorrect(); // dont think these do anything because insert addrow does already
-    // this.finalizeTree();
   };
-
-  // itemizes a fragment into the form required for formulate
-  // i.e. an array with delimiter nodes replaced with char versions
-  // _.itemizeFragment = function(fragment) {
-  //   var items = [];
-  //   var currentNode = fragment.ends[L];
-  //   var nextNode = currentNode[R];
-
-  //   while(currentNode !== 0) {
-  //     if (equalities.includes(currentNode.ctrlSeq)) {
-  //       items.push(delimiters.column);
-  //     }
-  //     items.push(currentNode);
-  //     currentNode = nextNode;
-  //     nextNode = nextNode[R];
-  //   }
-  //   return items;
-  // };
-  // OLD: remove
-  // converts a fragment into an aligned instance of the fragment
-  // with equalities in the central column
-  // TODO: have parser() call formulate()
-  // this function is mostly copied in from parser() - 
-  // however, i was unable to get parser to successfully
-  // call formulate from within .then()
-  // _.formulate = function(parent, items) {
-  //   console.log("aligned === parent");
-  //   console.log(this === parent);
-  //   // console.log(this);
-  //   // console.log(this);
-  //   var self = this;
-  //   // console.log("hereeee");
-  //   // var items = self.itemizeFragment(fragment);
-  //   var blocks = [];
-  //   var row = 0;
-  //   self.blocks = [];
-
-  //   function addCell() {
-  //     self.blocks.push(AlignedCell(row, self, blocks));
-  //     blocks = [];
-  //   }
-
-  //   let delimiterFound = false;
-  //   rowsWithEquals = [false];
-  //   for (var i=0; i<items.length; i+=1) {
-  //     if (items[i] instanceof MathBlock) {
-  //       blocks.push(items[i]);
-  //     } 
-  //     else {
-  //       if (blocks.length === 0) blocks = 0; // eh
-  //       addCell();
-  //       if (items[i] === delimiters.column) {
-  //         if (delimiterFound) {
-  //           throw new Error(
-  //             "Invalid aligned latex: Cannot contain multiple delimiters per row");
-  //         }
-  //         if (equalities.includes(items[i+1].ends[R].ctrlSeq)) {
-  //           blocks.push(items[++i]);
-  //           rowsWithEquals[row] = true;
-  //           delimiterFound = true;
-  //         }
-  //         else {
-  //           throw new Error(
-  //             "Invalid aligned latex: Must always delimit with &<equality>");
-  //         }
-  //         addCell();
-  //       }
-  //       else if (items[i] === delimiters.row) {
-  //         delimiterFound = false;
-  //         rowsWithEquals.push(false);
-  //         row++;
-  //       }
-  //     }
-  //   }
-  //   addCell();
-    // self.autocorrect(); // probably dont still need this
-  // };//.bind(this);
-
   
   _.html = function() {
     var cells = [], trs = '', i=0, row;
@@ -1616,133 +1510,6 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
 
     return super_.html.call(this);
   };
-
-
-
-  // _.parser = function() {
-  //   var self = this;
-  //   var optWhitespace = Parser.optWhitespace;
-  //   var string = Parser.string;
-
-  //   return optWhitespace
-  //   .then(string(/*this.*/delimiters.column)
-  //     .or(string(/*this.*/delimiters.row))
-  //     .or(latexMathParser.block))
-  //   .many()
-  //   .skip(optWhitespace)
-  //   .then(
-  //     function(items) {
-  //       self.blocks = [];
-  //       var itemArray = [];
-  //       var currentRow = 0;
-  //       var currentCellNum = 0;
-  //       var currentFragmentStart = 0;
-  //       var currentFragmentEnd = 0;
-  //       var colDelimFoundInRow = false;
-
-  //       function addRow() {
-  //         self.blocks.push(AlignedCell(currentRow, self));
-  //         self.blocks.push(AlignedCell(currentRow, self));
-  //         self.blocks.push(AlignedCell(currentRow, self));
-  //         currentCellNum = currentRow * 3;
-  //         currentRow++;
-  //         colDelimFoundInRow = false;
-  //         //currentFragment = 0;
-  //       }
-
-  //       function insertCell() {
-  //         if (itemArray.length === 0) {
-  //           currentCellNum++
-  //         }
-  //         else {
-  //           self.blocks[currentCellNum] = AlignedCell(currentRow, self, itemArray);
-  //           itemArray = [];
-  //         }
-  //       }
-
-  //       // function adoptToNextCell(fragment) {
-  //       //   if (fragment === 0) {
-  //       //     currentCellNum++
-  //       //     return;
-  //       //   }
-  //       //   if (fragment === currentFragmentEnd) {
-  //       //     console.log("currentFragmentStart");
-  //       //     console.log(currentFragmentStart);
-  //       //     console.log("currentFragmentEnd");
-  //       //     console.log(currentFragmentEnd);
-
-  //       //     fragment = Fragment(currentFragmentStart, currentFragmentEnd);
-  //       //     currentFragmentStart = 0;
-  //       //     currentFragmentEnd = 0;
-  //       //   }
-  //       //   fragment.adopt(self.blocks[currentCellNum], self.blocks[currentCellNum].ends[R], 0);
-  //       //   currentCellNum++
-  //       // }
-
-  //       // function appendToCurrentFragment(item) {
-  //       //   if (currentFragmentStart === 0) {
-  //       //     currentFragmentStart = item;
-  //       //     currentFragmentEnd = item;
-  //       //   }
-  //       //   else {
-  //       //     currentFragmentEnd = item;
-  //       //   }
-  //         //   console.log("appending item: ")
-  //         //   console.log(item)
-  //         //   console.log("appending to: ")
-  //         //   console.log(currentFragment);
-  //         //   console.log("currentFragment.ends[L].ends[L]");
-  //         //   console.log(currentFragment.ends[L].ends[L]);
-  //         //   console.log("currentFragment.ends[L].parent === item.parent");
-  //         //   console.log(currentFragment.ends[L].parent === item.parent);
-  //         //   pray('withDir and oppDir have the same parent',
-  //         //      currentFragment.ends[L] === oppDir.parent);
-  //         //   currentFragment = Fragment(currentFragment.ends[L], item);
-  //         //   console.log("got here");
-  //         // }
-  //      // }
-
-  //       addRow();
-  //       for (var i=0; i<items.length; i+=1) {
-  //         if (items[i] instanceof MathBlock) {
-  //           //appendToCurrentFragment(items[i]);
-  //           itemArray.push(items[i]);
-  //         } 
-  //         else {
-  //           insertCell();
-  //           //adoptToNextCell(currentFragmentEnd);
-  //           if (items[i] === delimiters.column) {
-  //             if (colDelimFoundInRow) {
-  //               throw new Error(
-  //                 "Invalid aligned latex: Cannot contain multiple delimiters per row");
-  //             }
-  //             i++;
-  //             if (!equalities.includes(items[i].ends[R].ctrlSeq)) {
-  //               throw new Error(
-  //                 "Invalid aligned latex: Must always delimit with &<equality>");
-  //             }
-  //             else {
-  //               itemArray.push(items[i]);
-  //               insertCell();
-  //               //adoptToNextCell(items[i]);
-  //               colDelimFoundInRow = true;
-  //             }
-  //           }
-  //           else if (items[i] === delimiters.row) {
-  //             addRow();
-  //           }
-  //         }
-  //       }
-  //       insertCell();
-  //       //adoptToNextCell(currentFragmentEnd);
-  //       self.finalizeTree();
-  //       //self.autocorrect();
-  //       return Parser.succeed(self);
-  //     }.bind(this)
-  //   );
-  // };
-
-
 
   _.parser = function() { // old
     var self = this;
@@ -1810,24 +1577,9 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
         }
         addCell();
         fillRow();
-        
-        // self.finalizeTree();
-        // self.autocorrect(); // probably dont still need this
         return Parser.succeed(self);
       }.bind(this)
     );
-  };
-
-  //  old
-  _.addAlignRow = function(cell, cursor) {
-    // var aligned = this;
-    // aligned.insert('addRow', cell);
-    // var newMiddleCell = aligned.blocks[(cell.row+1)*3+1];
-    // cursor.insAtRightEnd(newMiddleCell[L]);
-    // cursor.insAtRightEnd(newMiddleCell);
-    // // todo: handle if prev was inequality
-    // aligned.createToCell(LatexCmds['='](), newMiddleCell);
-    // cursor.insAtRightEnd(newMiddleCell[R]);
   };
 
   _.moveToCell = function(fragment, cell) {
@@ -1838,20 +1590,6 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
   _.createToCell = function(node, cell) { // unused?
     node.adopt(cell, cell.ends[R], 0);
     node.jQize().appendTo(cell.jQ);
-  };
-
-  // DAN
-  // can move to general matrix class?
-  _.rowIsEmpty = function(row) {
-    if (!this.blocks[row]) {
-      throw new OutOfBoundsError("rowIsEmpty(): invalid row number");
-    }
-    for (var i = row*3; i < (row+1)*3; i++) {
-      if (!this.blocks[i].isEmpty()) {
-        return false;
-      }
-    }
-    return true;
   };
 
   _.rowContainsEquality = function(row) {
@@ -1969,14 +1707,7 @@ var AlignedCell = P(MathBlock, function(_, super_) {
       }
     }
   };
-  // _.goDirUntilFoundPos =  function(currentCell, cursor, dir, pos) {
-  //   if (cursor[pos] !== 0 || !currentCell[dir] || 
-  //     (/*currentCell[dir] && */currentCell.row !== currentCell[dir].row)) 
-  //     return [currentCell, cursor[pos]];
-  //   super_.keystroke.apply(currentCell, [(dir === R ? 'Right' : 'Left'), e, cursor.ctrlr]);
-  //   return goDirUntilFoundPos(currentCell[dir], cursor, dir, pos);
-  // };
-
+  
   /**
    * 
    * @param {*} ctrlr Controller containing cursor which will be moved
@@ -2002,17 +1733,8 @@ var AlignedCell = P(MathBlock, function(_, super_) {
   
   _.keystroke = function(key, e, ctrlr) {
     let found;
-    let prevRow, newRow, prevCol, newCol;
     let cursor = ctrlr.cursor;
     switch (key) {
-    // case 'Shift-Spacebar': // dont want users to add new cols/rows manually
-    //   e.preventDefault();
-    //   return this.parent.insert('addColumn', this);
-    //   break;
-    // case 'Shift-Enter':
-    //   return this.parent.insert('addRow', this);
-    //   break;
-
     case 'Enter':
       found = this.findSomethingOrEnd(ctrlr, R, R);
       this.parent.insert('addRow', this);
@@ -2041,7 +1763,8 @@ var AlignedCell = P(MathBlock, function(_, super_) {
         }
         else {
           if (this.parent.rowIsEmpty(this.row)) {
-            super_.keystroke.apply(this, arguments);
+            if (found || cursor.parent === this) super_.keystroke.apply(this, arguments);
+            else this.findSomethingOrEnd(ctrlr, L, L);
           }
           else {
             super_.keystroke.apply(this, ['Left', null, ctrlr]);
@@ -2069,15 +1792,24 @@ var AlignedCell = P(MathBlock, function(_, super_) {
     case 'Left':
       // if at leftmost col and topmost row, dont want to escape
       if (this !== this.parent.blocks[0] || ctrlr.cursor[L]) {
-        super_.keystroke.apply(this, arguments);
+        //super_.keystroke.apply(this, arguments);
         this.findSomethingOrEnd(ctrlr, L, L);
+        if (cursor[L] || cursor.parent === this) {
+          super_.keystroke.apply(this, arguments);
+          this.findSomethingOrEnd(ctrlr, L, L);
+        }
       }
       return;
     case 'Right':
-      if (this !== this.parent.blocks[this.parent.blocks.length-1] || ctrlr.cursor[R]) {
+      this.findSomethingOrEnd(ctrlr, R, R);
+      if (cursor.parent !== this.parent.blocks[this.parent.blocks.length-1] || cursor[R]) {
         super_.keystroke.apply(this, arguments);
-        if (this.row === ctrlr.cursor.parent.row)
-          this.findSomethingOrEnd(ctrlr, R, L);
+        if (this.row === cursor.parent.row) {
+          found = this.findSomethingOrEnd(ctrlr, R, L);
+          if (!found && cursor.parent[R]) {
+            super_.keystroke.apply(this, arguments);
+          }
+        }
       }
       return;
     }
@@ -2095,7 +1827,6 @@ var AlignedCell = P(MathBlock, function(_, super_) {
       else {
         ctrlr.cursor.insRightOf(nearestLeftNode);
       }
-      console.log("after deletion called");
     }
   };
 
@@ -2103,16 +1834,6 @@ var AlignedCell = P(MathBlock, function(_, super_) {
     let leftOfCursor = cursor[L]; // thing just inserted
     this.parent.normalizeRow(cursor, this.row);
     cursor.insRightOf(leftOfCursor);
-  };
-
-  // unused?
-  _.contains = function(ctrlSeq) {
-    let child = this.children().ends[L];
-    while (child) {
-      if (child.ctrlSeq === ctrlSeq) return true;
-      child = child[R];
-    }
-    return false;
   };
 
   _.asArray = function() {
@@ -2125,287 +1846,12 @@ var AlignedCell = P(MathBlock, function(_, super_) {
     return array;
   };
 
-  // _.normalizeRow = function(ctrlr) {
-  //   var middleCell = this.parent.blocks[this.row*3 + 1];
-  //   this.parent.moveToCell(middleCell.children(), middleCell[L]);
-  //   this.parent.moveToCell(middleCell[R].children(), middleCell[L]);
-  //   this.parent.splitAcrossCells(middleCell[L].children(), cursor, true);
-  // }
-
-  // _.fixAlignedRow = function(ctrlr, cursor) {
-  //   if (ctrlr) cursor = ctrlr.cursor;
-  //   var middleCell = this.parent.blocks[this.row*3 + 1];
-  //   if (typeof middleCell === 'undefined') {
-  //     if (!ctrlr) throw new Error("fixAlignedRow(): undefined controller")
-  //     super_.keystroke.apply(this, ['Left', null, ctrlr]);
-  //     // super_.keystroke.apply(this, ['Up', null, ctrlr]);
-  //     return false;
-  //     //cursor.insAtRightEnd(this.parent.blocks[(this.row-1)+2]);
-  //   }
-  //   else {
-  //     this.parent.moveToCell(middleCell.children(), middleCell[L]);
-  //     this.parent.moveToCell(middleCell[R].children(), middleCell[L]);
-  //     this.parent.splitAcrossCells(middleCell[L].children(), cursor, true);
-  //     return true;
-  //   }
-  // };
-
-  // _.goDirUntilFoundPos = function(ctrlr, currentCell, dir, pos, moving) {
-  //     //return [currentCell, ctrlr.cursor[pos]];
-  //   if (ctrlr.cursor[pos] !== 0 || !currentCell[dir] || !currentCell[dir][dir] ||
-  //     (moving && typeof ctrlr.cursor.parent[dir] !== 'undefined' && 
-  //       ctrlr.cursor.parent.row !== ctrlr.cursor.parent[dir].row))
-  //     //(/*currentCell[dir] && */currentCell.row !== currentCell[dir].row)) 
-  //     return [currentCell, ctrlr.cursor[pos]];
-  //   //ctrlr.cursor.insDirOf(dir, ctrlr.cursor);
-  //   super_.keystroke.apply(currentCell, [(dir === R ? 'Right' : 'Left'), null, ctrlr]);
-  //   return this.goDirUntilFoundPos(ctrlr, currentCell[dir], dir, pos, moving);
-  // };
-  // insertLocation = [cell, node]
-  // _.afterInsertion = function(ctrlr, cursor) {//, insertionCell, insertionNode, dir) {
-  //   if (ctrlr) cursor = ctrlr.cursor;
-  //   var leftOfCursorNode = cursor[L];
-  //   //if (!insertionNode && cursor[L]) insertionNode = cursor[L];
-  //   //[insertionCell, insertionNode] = this.goDirUntilFoundPos(this, cursor, L, L);
-  //   // var middleCell = this.parent.blocks[this.row*3 + 1];
-  //   // this.parent.moveToCell(middleCell.children(), middleCell[L]);
-  //   // this.parent.moveToCell(middleCell[R].children(), middleCell[L]);
-  //   // this.parent.splitAcrossCells(middleCell[L].children(), cursor, true);
-  //   this.fixAlignedRow(ctrlr, cursor);
-  //   cursor.insRightOf(leftOfCursorNode);
-  //   // if (insertionNode) {
-  //   //   cursor.insRightOf(insertionNode);
-  //   //   if (!dir || dir === L) cursor.insLeftOf(insertionNode);
-  //   //   else if (dir === R) cursor.insRightOf(insertionNode);
-  //   // }
-  //   // else if (insertionCell) {
-  //   //   cursor.insAtLeftEnd(insertionCell);
-  //   // }
-  // };
-
-  // _.afterDeletion = function(ctrlr, dir) {
-  //   console.log("after deletion called");
-  //   var insertionCell, insertionNode;
-  //   [insertionCell, insertionNode] = this.goDirUntilFoundPos(ctrlr, this, dir, L, true);
-  //   if (this.fixAlignedRow(ctrlr)) {
-
-  //     if (insertionNode) {
-  //       console.log("insertionNode");
-  //       ctrlr.cursor.insRightOf(insertionNode);
-  //       // if (!dir || dir === L) cursor.insLeftOf(insertionNode);
-  //       // else if (dir === R) cursor.insRightOf(insertionNode);
-  //     }
-  //     else if (insertionCell) {
-  //       console.log("insertionCell");
-  //       ctrlr.cursor.insAtLeftEnd(insertionCell);
-  //     }
-  //     else throw new Error("afterDeletion(): could not find insertion place");
-  //   }
-
-  // };
-
-  // _.afterMove = function(ctrlr, dir) {
-    // var cell = ctrlr.cursor.parent;
-    // console.log("dir");
-    // console.log(dir);
-
-    // if (dir === R && (!cell[L] || cell[L].row !== cell.row)) {
-    //   return;
-    // }
-    // else {
-    //   console.log("got here meaning left called");
-    //   this.goDirUntilFoundPos(ctrlr, this, dir, L);
-    // }
-  // };
-
   _.deleteOutOf = function(dir, cursor) {
     var self = this, args = arguments;
     this.parent.backspace(this, dir, cursor, function () {
       // called when last cell gets deleted
       return super_.deleteOutOf.apply(self, args);
     });
-  }
+  };
 
-  // _.keystroke = function(key, e, ctrlr) {
-  //   function goDirUntilFoundPos(currentCell, dir, pos, moving) {
-  //     if (ctrlr.cursor[pos] !== 0 || !currentCell[dir] || !currentCell[dir][dir] ||
-  //       (moving && typeof ctrlr.cursor.parent[dir] !== 'undefined' && 
-  //         ctrlr.cursor.parent.row !== ctrlr.cursor.parent[dir].row))
-  //       //(/*currentCell[dir] && */currentCell.row !== currentCell[dir].row)) 
-  //       return [currentCell, ctrlr.cursor[pos]];
-  //     super_.keystroke.apply(currentCell, [(dir === R ? 'Right' : 'Left'), null, ctrlr]);
-  //     return goDirUntilFoundPos(currentCell[dir], dir, pos, moving);
-  //   }
-
-  //   switch (key) {
-  //   // case 'Shift-Spacebar': // dont want users to add new cols/rows manually
-  //   //   e.preventDefault();
-  //   //   return this.parent.insert('addColumn', this);
-  //   //   break;
-  //   // case 'Shift-Enter':
-  //   //   return this.parent.insert('addRow', this);
-  //   //   break;
-
-  //   case 'Enter':
-  //     //return this.parent.addAlignRow(this, ctrlr.cursor);
-  //     this.parent.insert('addRow', this);
-  //     ctrlr.cursor.insAtLeftEnd(this.parent.blocks[(this.row+1) * 3]);
-  //     return;
-  //     break;
-  //   case 'Backspace':
-  //     goDirUntilFoundPos(this, L, L, true);
-  //     // will cause a bug if text typed to right of align matrix
-  //     // because moveToCell appends to right
-
-  //     // if (ctrlr.cursor[L] === 0 && ctrlr.cursor[R] !== 0) {
-  //     //   if (!this[L]) {
-  //     //     this.parent.moveToCell(this.children(), this.parent.parent);
-  //     //   }
-  //     //   else if (this.row !== this[L].row) {
-  //     //     this.parent.moveToCell(this.children(), this[L]);
-  //     //   }
-  //     // }
-
-  //     // if (cursor[L] === 0 && cursor[R] !== 0 &&
-  //     //     (!this[L] || this.row !== this[L].row)) {
-  //     //   this.parent.moveToCell(this.children(), )
-  //     // }
-
-  //     break;
-  //     if (!this[L] || (ctrlr.cursor[L] === 0 && this.row !== this[L].row))
-  //       break;
-
-      
-  //     break;
-  //     var insertionCell, insertionNode;
-  //     [insertionCell, insertionNode] = goDirUntilFoundPos(this, L, R);
-  //     goDirUntilFoundPos(this, L, L);
-  //     // console.log("ctrlr.cursor[L].ctrlSeq");
-  //     // console.log(ctrlr.cursor[L].ctrlSeq);
-  //     // break;
-  //     //super_.keystroke.apply(this, arguments);
-  //     //goDirUntilFoundPos(L, L, this);
-  //     // if in a place you shouldn't really be (i.e. leftmost part of
-  //     // a cell - unless at start of row)
-
-  //     super_.keystroke.apply(this, arguments);
-  //     goDirUntilFoundPos(this, L, L);
-  //     //this.keystroke('Left', e, ctrlr);
-  //     break;
-
-  //     // if (ctrlr.cursor[L] === 0 && this[L] && this.row === this[L].row) {
-  //     //   super_.keystroke.apply(this, ['Left', e, ctrlr]);
-  //     // }
-  //     //throw new Error('testing');
-
-  //     var insertionCell, insertionNode;
-  //     [insertionCell, insertionNode] = goDirUntilFoundPos(this, L, L);
-      
-  //     // console.log("ctrlr.cursor[L].ctrlSeq");
-  //     // console.log(ctrlr.cursor[L].ctrlSeq);
-  //     //this.afterInsertion(ctrlr, insertionCell, insertionNode);
-      
-  //     //goDirUntilFoundPos(this, L, L);
-  //     // if (ctrlr.cursor[L] === 0 && ctrlr.cursor[R] !== 0 &&
-  //     //     this[L] && this.row === this[L].row) {
-  //     //   super_.keystroke.apply(this, arguments);
-  //     // }
-
-  //     //this.afterInsertion(ctrlr.cursor, goDirUntilFoundPos(this, L, L), R);
-  //     return;
-  //   case 'Del':
-  //     goDirUntilFoundPos(this, R, R, true);
-      
-  //     break;
-  //     //goDirUntilFoundPos(this, R, L, true);
-  //     //super_.keystroke.apply(this, ['Backspace', e, ctrlr]);
-  //     //return;
-  //     // super_.keystroke.apply(this, arguments);
-  //     // return;
-  //   case 'Left':
-  //     if (ctrlr.cursor[L] === 0 && typeof this[L] === 'undefined') return;
-  //     super_.keystroke.apply(this, arguments);
-  //     // if (this[L] && ctrlr.cursor[L] === 0) {
-  //     //   super_.keystroke.apply(this, arguments);
-  //     // }
-  //     // return;
-  //     // console.log("ctrlr.cursor.parent.row before");
-  //     // console.log(ctrlr.cursor.parent.row);
-  //     goDirUntilFoundPos(this, L, L, true);
-  //     // console.log("ctrlr.cursor.parent.row after");
-  //     // console.log(ctrlr.cursor.parent.row);
-  //     // var cursorCell = ctrlr.cursor.parent;
-  //     // // will sometimes overshoot, so avoid
-  //     // if (!cursorCell[L] || cursorCell.row !== cursorCell[L].row) {
-  //     //   super_.keystroke.apply(cursorCell, ['Right', null, ctrlr]);
-  //     // }
-  //     return
-  //     break;
-  //     // super_.keystroke.apply(this, arguments);
-  //     // goDirUntilFoundPos(this, L, L);
-  //     // throw new Error("ok stop here");
-    
-  //     //goDirUntilFoundPos(this, L, L);
-  //     //super_.keystroke.apply(this, arguments);
-  //     // if (ctrlr.cursor[L] === 0 && ctrlr.cursor[R] !== 0 &&
-  //     //     this[L] && this.row === this[L].row) {
-  //     //   super_.keystroke.apply(this, arguments);
-  //     // }
-  //     // if (ctrlr.cursor[L] === 0 && this[L] && this.row === this[L].row) {
-  //     //   super_.keystroke.apply(this, arguments);
-  //     // }
-  //     //goDirUntilFoundPos(L, L, this);
-  //     //return;
-  //   case 'Right':
-  //     if (ctrlr.cursor[R] === 0 && typeof this[R] === 'undefined') return;
-  //     //goDirUntilFoundPos(this, R, L);
-  //     super_.keystroke.apply(this, arguments);
-  //     goDirUntilFoundPos(this, R, L, true);
-  //     return;
-  //     break;
-  //     // if (ctrlr.cursor[L] === 0 && ctrlr.cursor[R] !== 0 &&
-  //     //     this[R] && this.row === this[R].row) { // && this[L] && this.row === this[L].row) {
-  //     //   super_.keystroke.apply(this, arguments);
-  //     // }
-  //     //goDirUntilFoundPos(R, L, this);
-  //     //return;
-  //   //case 'Down':
-  //     // console.log("this[R]");
-  //     // console.log(this[R]);
-  //     // return;
-  //     // console.log("typeof this.children().ends[R] === 'undefined'");
-  //     // console.log(typeof this.children().ends[R] === 'undefined');
-
-  //     // var middleCell = this.parent.blocks[this.row*3 + 1];
-  //     // this.parent.moveToCell(middleCell.children(), middleCell[L]);
-  //     // this.parent.moveToCell(middleCell[R].children(), middleCell[L]);
-  //     //this.parent.moveToCell(this.children(), this[L]);
-
-  //     // this.parent.splitAcrossCells(this[L].children(), ctrlr.cursor, true);
-  //     //Letter('n').adopt()
-  //     //break;
-  //   }
-
-  //   return super_.keystroke.apply(this, arguments);
-
-  //   //throw new Error("testing for asynchronous behaviour");
-
-  //   //throw new Error("here");
-  //   // var justTyped = 
-
-  //   // var middleCell = this.parent.blocks[this.row*3 + 1];
-  //   // //super_.keystroke.apply(this, ['Right', e, ctrlr]);
-  //   // this.parent.moveToCell(middleCell.children(), middleCell[L]);
-  //   // this.parent.moveToCell(middleCell[R].children(), middleCell[L]);
-  //   // this.parent.splitAcrossCells(middleCell[L].children(), ctrlr.cursor, true);
-
-  //   // if (this.parent.equalities.includes(ctrlr.cursor[R].ctrlSeq)) {
-  //   //   console.log("here");
-  //   //   var middleCell = this.parent.blocks[this.row*3 + 1];
-  //   //   this.parent.moveToCell(middleCell.children(), middleCell[L]);
-  //   //   this.parent.moveToCell(middleCell[R].children(), middleCell[L]);
-  //   //   this.parent.splitAcrossCells(middleCell[L].children(), ctrlr.cursor, true);
-  //   // }
-  //   //return;
-  // };
 });

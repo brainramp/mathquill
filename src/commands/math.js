@@ -25,14 +25,6 @@ var MathElement = P(Node, function(_, super_) {
     if (self[R].siblingCreated) self[R].siblingCreated(options, L);
     if (self[L].siblingCreated) self[L].siblingCreated(options, R);
     self.bubble('reflow');
-
-
-    if (self.parent instanceof AlignedCell) { // DAN
-    // console.log("insertion finalized");
-    // throw new Error("insertion finalized");
-    //   console.log("self.parent.ends[R].ctrlSeq");
-    //   console.log(self.parent.ends[R].ctrlSeq);
-    }
   };
   // If the maxDepth option is set, make sure
   // deeply nested content is truncated. Just return
@@ -94,7 +86,6 @@ var MathCommand = P(MathElement, function(_, super_) {
   };
   _.isEmpty = function() {
     return this.foldChildren(true, function(isEmpty, child) {
-      console.log("blahhhhhhh");
       return isEmpty && child.isEmpty();
     });
   };
@@ -129,19 +120,6 @@ var MathCommand = P(MathElement, function(_, super_) {
     }
     cmd.finalizeInsert(cursor.options);
     cmd.placeCursor(cursor);
-    // console.log("cmd");
-    // console.log(cmd);
-    console.log("cmd.parent instanceof AlignedCell");
-    console.log(cmd.parent instanceof AlignedCell);
-    // console.log("cmd.parent instanceof MathCommand");
-    // console.log(cmd.parent instanceof MathCommand);
-    // console.log("cmd.parent");
-    // console.log(cmd.parent);
-
-    console.log("cmd.parent");
-    console.log(cmd.parent);
-//DAN
-    //if(cmd.parent.afterInsertion) cmd.parent.afterInsertion(cursor);
   };
   _.createBlocks = function() {
     var cmd = this,
@@ -376,23 +354,7 @@ var Symbol = P(MathCommand, function(_, super_) {
     }
     cmd.finalizeInsert(cursor.options);
     cmd.placeCursor(cursor);
-    // console.log("cmd");
-    // console.log(cmd);
-    console.log("cmd.parent instanceof AlignedCell");
-    console.log(cmd.parent instanceof AlignedCell);
-    // console.log("cmd.parent instanceof MathCommand");
-    // console.log(cmd.parent instanceof MathCommand);
-    // console.log("cmd.parent");
-    // console.log(cmd.parent);
-
-    console.log("cmd.parent");
-    console.log(cmd.parent);
-//DAN
-// thank fuck this worked
-// but fix this up so you aren't copy pasting code
-    console.log("cursor");
-    console.log(cursor);
-    //throw new Error("stop here please");
+    // currently only used in AlignedCell to autocorrect things after insertion
     if(cmd.parent.afterInsertion) cmd.parent.afterInsertion(cursor);
   };
   _.numBlocks = function() { return 0; };
@@ -577,7 +539,7 @@ API.StaticMath = function(APIClasses) {
 };
 
 //var RootMathBlock = P(MathBlock, RootBlockMixin);
-var RootMathBlock = P(MathBlock, function(_, super_) { // DAN
+var RootMathBlock = P(MathBlock, function(_, super_) {
   var names = 'moveOutOf deleteOutOf selectOutOf upOutOf downOutOf'.split(' ');
   for (var i = 0; i < names.length; i += 1) (function(name) {
     _[name] = function(dir) { this.controller.handle(name, dir); };
@@ -588,33 +550,14 @@ var RootMathBlock = P(MathBlock, function(_, super_) { // DAN
     this.controller.handle('edit');
   };
   _.keystroke = function(key, e, ctrlr) {
-    if (key === 'Enter') { // create aligned environment\
-      if (this.ends[R] === 0) return; // temp hack fix
-      let cursor = this.cursor;
+    if (key === 'Enter') { 
+      // create new Aligned environment
       let aligned = Aligned();
       let prevChildren = this.children();
-      //prevChildren.remove();
-      cursor.insAtRightEnd(this);
-      aligned.createLeftOf(cursor);
-
-      aligned.moveToCell(prevChildren, aligned.blocks[0], 0);
-      aligned.splitAcrossCells(prevChildren, cursor);
-      //cursor.insAtRightEnd(aligned.blocks[aligned.blocks.length/2]);
-      // aligned.moveToCell(Fragment(prevChildren.ends[L][R], prevChildren.ends[R]), aligned.blocks[1], 0);
-      // aligned.moveToCell(Fragment(prevChildren.ends[L][R], prevChildren.ends[R]), aligned.blocks[1], 0);
-     
-      //aligned.splitAcrossCells(prevChildren, aligned.blocks[0]);
-      
-      // 
-      // console.log("aligned.itemizeFragment(prevChildren)");
-      // console.log(aligned.itemizeFragment(prevChildren));
-      // aligned.formulate(prevChildren);
-
-
-      //aligned.formulate(aligned, aligned.itemizeFragment(prevChildren));
-      // console.log("aligned");
-      // console.log(aligned);
-
+      aligned.createLeftOf(this.cursor);
+      aligned.moveToCell(prevChildren, aligned.blocks[0], 0); // DAN
+      // split fragment centered around equalities
+      aligned.splitAcrossCells(prevChildren, this.cursor);
       return;
     }
     if (ctrlr.options.spaceBehavesLikeTab
