@@ -1834,17 +1834,8 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     fragment.disown();
     fragment.adopt(cell, cell.ends[R], 0);
     fragment.jQ.appendTo(cell.jQ);
-    // if (!cell) {
-    //   let newRow = (typeof row != 'undefined') ? row : this.ends[R].row;
-    //   this.blocks.push(AlignedCell(newRow, this, fragment));
-    //   // needs testing
-    // }
-    // else {
-    //   fragment.adopt(cell, 0, 0);
-    //   fragment.jQ.appendTo(cell.jQ);
-    // }
   };
-  _.createToCell = function(node, cell) {
+  _.createToCell = function(node, cell) { // unused?
     node.adopt(cell, cell.ends[R], 0);
     node.jQize().appendTo(cell.jQ);
   };
@@ -2023,8 +2014,24 @@ var AlignedCell = P(MathBlock, function(_, super_) {
     //   break;
 
     case 'Enter':
+      found = this.findSomethingOrEnd(ctrlr, R, R);
       this.parent.insert('addRow', this);
-      cursor.insAtLeftEnd(this.parent.blocks[(this.row+1) * 3]);
+      if (found) {
+        let cell = found.parent;
+        // maybe change moveToCell to appendValueOf and have it be a cell function // DAN
+        cell.parent.moveToCell(Fragment(found, cell.ends[R]), cell.parent.blocks[(cell.row+1)*3]);
+        cell = cell[R];
+        while (this.row === cell.row) {
+          cell.parent.moveToCell(cell.children(), cell.parent.blocks[(cell.row+1)*3]);
+          cell = cell[R];
+        }
+        cell.parent.splitAcrossCells(cell.parent.blocks[cell.row*3], cursor, true);
+        cursor.insLeftOf(found);
+        this.findSomethingOrEnd(ctrlr, L, L);
+      }
+      else {
+        cursor.insAtLeftEnd(this.parent.blocks[(this.row+1) * 3]);
+      }
       return;
     case 'Backspace':
       if (this !== this.parent.blocks[0] || ctrlr.cursor[L]) {
