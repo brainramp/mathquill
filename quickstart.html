@@ -5,11 +5,18 @@
     <link rel="stylesheet" type="text/css" href="build/mathquill.css">
   </head>
   <body>
-    <p>Static math span: <span id="static-math">x = \frac{ -b \pm \sqrt{b^2-4ac} }{ 2a }</span>
-    <p>Editable math field: <span id="math-field">x^2</span></p>
+    <p>Static math span: <span id="static-math">
+      \begin{aligned}
+        2x &= 4 \\
+        x &= 2
+      \end{aligned}
+    </span>
+    <p>Editable math field (insert maths and try pressing enter): <span id="math-field">
+      
+    </span></p>
     <p>LaTeX of what you typed: <code id="latex">x^2</code></p>
-    <p><a href="http://docs.mathquill.com/en/latest/Getting_Started/">MathQuill&rsquo;s Getting
-      Started Guide</a></p>
+    <!-- <p><a href="http://docs.mathquill.com/en/latest/Getting_Started/">MathQuill&rsquo;s Getting
+      Started Guide</a></p> -->
 
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.2/jquery.js"></script>
     <script src="build/mathquill.js"></script>
