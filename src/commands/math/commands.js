@@ -1303,7 +1303,7 @@ Environments.matrix = P(Environment, function(_, super_) {
         finalDeleteCallback();
         this.finalizeTree();
       }
-      // WIP check if whole matrix empty, then delete it
+      // check if whole matrix empty, then delete it
       if (this.removeEmptyRowsIfLeftmost && cell.row === 0) {
         var allEmpty = true; // DAN
         for (var i = 0; i < this.blocks.length; i++) {
@@ -1489,7 +1489,9 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
       this.splitAcrossCells(nextLineWithEqualityFragment, cursor, true);
     }
     else if (!avoidExtraRow) {
-      this.addAlignRow(cell, cursor);
+      //this.addAlignRow(cell, cursor); //old, does nothing
+      this.insert('addRow', cell);
+      cursor.insAtLeftEnd(this.blocks[(cell.row+1)*3]);
     }
 
     // this.autocorrect(); // dont think these do anything because insert addrow does already
@@ -1816,15 +1818,16 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     );
   };
 
+  //  old
   _.addAlignRow = function(cell, cursor) {
-    var aligned = this;
-    aligned.insert('addRow', cell);
-    var newMiddleCell = aligned.blocks[(cell.row+1)*3+1];
-    cursor.insAtRightEnd(newMiddleCell[L]);
-    cursor.insAtRightEnd(newMiddleCell);
-    // todo: handle if prev was inequality
-    aligned.createToCell(LatexCmds['='](), newMiddleCell);
-    cursor.insAtRightEnd(newMiddleCell[R]);
+    // var aligned = this;
+    // aligned.insert('addRow', cell);
+    // var newMiddleCell = aligned.blocks[(cell.row+1)*3+1];
+    // cursor.insAtRightEnd(newMiddleCell[L]);
+    // cursor.insAtRightEnd(newMiddleCell);
+    // // todo: handle if prev was inequality
+    // aligned.createToCell(LatexCmds['='](), newMiddleCell);
+    // cursor.insAtRightEnd(newMiddleCell[R]);
   };
 
   _.moveToCell = function(fragment, cell) {
@@ -1874,10 +1877,52 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
   };
 
   _.normalizeRow = function(cursor, row) {
-    var middleCell = this.blocks[row*3 + 1];
+    let middleCell = this.blocks[row*3 + 1];
     this.moveToCell(middleCell.children(), middleCell[L]);
     this.moveToCell(middleCell[R].children(), middleCell[L]);
     this.splitAcrossCells(middleCell[L].children(), cursor, true);
+  };
+
+  _.mergeToEndOfRow = function(row1, row2) {
+    if (!this.blocks[row1*3] || !this.blocks[row2*3]) {
+      throw new Error("mergeRows(): row doesn't exist");
+    }
+    if (row2 !== row1 + 1) {
+      throw new Error("mergeRows(): non consecutive rows provided");
+    }
+    let row1End = this.blocks[row1*3 + 2];
+    let row2Middle = this.blocks[row2*3 + 1];
+    this.moveToCell(row2Middle[L].children(), row1End);
+    this.moveToCell(row2Middle.children(), row1End);
+    this.moveToCell(row2Middle[R].children(), row1End);
+  }
+
+  _.mergeRowsNeatly = function(ctrlr, row1, row2) {
+    // if both rows exist
+    if (this.blocks[row1*3] && this.blocks[row2*3]) {
+      // merge two rows if they dont both have equalities
+      if (!(this.rowContainsEquality(row1) && 
+            this.rowContainsEquality(row2))) {
+              let cursor = ctrlr.cursor;
+        // find leftmost node to return the cursor to
+        let found = cursor.parent.findSomethingOrEnd(ctrlr, L, L);
+        if (!found && cursor.parent.row === row2) {
+          cursor.insAtRightEnd(this.blocks[row2*3-1]);
+          found = cursor.parent.findSomethingOrEnd(ctrlr, L, L);
+        }
+
+        this.mergeToEndOfRow(row1, row2);
+        ctrlr.cursor.insAtLeftEnd(this.blocks[row2*3])
+        super_.keystroke.apply(this, ['Backspace', null, ctrlr]);
+
+        if (found) {
+          cursor.insRightOf(found);
+        }
+        else {
+          cursor.insAtLeftEnd(this.blocks[row1*3]);
+        }
+      }
+    }
   };
   
 });
@@ -1982,33 +2027,50 @@ var AlignedCell = P(MathBlock, function(_, super_) {
       cursor.insAtLeftEnd(this.parent.blocks[(this.row+1) * 3]);
       return;
     case 'Backspace':
-      this.findSomethingOrEnd(ctrlr, L, L);
-      if (!(this.parent.rowIsEmpty(this.row) && cursor.parent !== this)) {
+      if (this !== this.parent.blocks[0] || ctrlr.cursor[L]) {
+        found = this.findSomethingOrEnd(ctrlr, L, L);
+        if (found) {
+          super_.keystroke.apply(this, arguments);
+        }
+        else {
+          if (this.parent.rowIsEmpty(this.row)) {
+            super_.keystroke.apply(this, arguments);
+          }
+          else {
+            super_.keystroke.apply(this, ['Left', null, ctrlr]);
+            this.parent.mergeRowsNeatly(ctrlr, this.row-1, this.row);
+          }
+        }
+      }
+      else {
         super_.keystroke.apply(this, arguments);
       }
-      this.findSomethingOrEnd(ctrlr, L, L);
       return;
     case 'Del':
-      super_.keystroke.apply(this, ['Right', null, ctrlr]);
-      found = this.findSomethingOrEnd(ctrlr, R, L);
-      super_.keystroke.apply(this, ['Backspace', null, ctrlr]);
+      if (this !== this.parent.blocks[this.parent.blocks.length-1] || ctrlr.cursor[R]) {
+        super_.keystroke.apply(this, ['Right', null, ctrlr]);
+        if (this.row === ctrlr.cursor.parent.row) {
+          found = this.findSomethingOrEnd(ctrlr, R, L);
+          if (!found && ctrlr.cursor.parent[R]) {
+            super_.keystroke.apply(this, ['Right', null, ctrlr]);
+          }
+          super_.keystroke.apply(this, ['Backspace', null, ctrlr]);
+        }
+        this.parent.mergeRowsNeatly(ctrlr, this.row, this.row + 1);
+      }
       return;
     case 'Left':
-      this.findSomethingOrEnd(ctrlr, L, L);
-      if (cursor.parent[L] || cursor[L]) {
+      // if at leftmost col and topmost row, dont want to escape
+      if (this !== this.parent.blocks[0] || ctrlr.cursor[L]) {
         super_.keystroke.apply(this, arguments);
         this.findSomethingOrEnd(ctrlr, L, L);
       }
       return;
     case 'Right':
-      this.findSomethingOrEnd(ctrlr, R, R)
-      if (cursor.parent[R] || cursor[R]) {
-        prevRow = cursor.parent.row;
+      if (this !== this.parent.blocks[this.parent.blocks.length-1] || ctrlr.cursor[R]) {
         super_.keystroke.apply(this, arguments);
-        newRow = cursor.parent.row;
-        found = 0;
-        if (prevRow === newRow) found = this.findSomethingOrEnd(ctrlr, R, L);
-        this.findSomethingOrEnd(ctrlr, L, L);
+        if (this.row === ctrlr.cursor.parent.row)
+          this.findSomethingOrEnd(ctrlr, R, L);
       }
       return;
     }
