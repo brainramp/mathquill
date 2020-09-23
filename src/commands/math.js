@@ -551,12 +551,19 @@ var RootMathBlock = P(MathBlock, function(_, super_) {
   };
   _.keystroke = function(key, e, ctrlr) {
     if (key === 'Enter') { 
+      let child = this.children().ends[L];
+      // avoid creating aligned math if one already exists
+      while(child) {
+        if (child instanceof Aligned)
+          return;
+        child = child[R];
+      }
       // create new Aligned environment
       let aligned = Aligned();
       let prevChildren = this.children();
       aligned.createLeftOf(this.cursor);
-      aligned.moveToCell(prevChildren, aligned.blocks[0], 0); // DAN
-      // split fragment centered around equalities
+      //aligned.moveToCell(prevChildren, aligned.blocks[0], 0); // DAN
+      aligned.blocks[0].appendToCell(prevChildren);
       aligned.splitAcrossCells(prevChildren, this.cursor);
       return;
     }

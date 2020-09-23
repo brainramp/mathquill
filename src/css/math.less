@@ -7,6 +7,7 @@
   overflow: hidden;
   vertical-align: middle;
 }
+
 .mq-math-mode {
   font-variant: normal;
   font-weight: normal;
@@ -417,6 +418,15 @@
     }
   }
 
+  // .mq-aligned {
+  //   td {
+  //     border: none;
+  //     width: auto; /* defensive resets */
+  //     padding: 0.1em 0.0em !important;
+  //     vertical-align: baseline;
+  //   }
+  // }
+
   .mq-matrix, .mq-aligned{
     vertical-align: middle;
     margin-left: 0.1em;
@@ -445,23 +455,26 @@
       }
 
       &.aligned td.mq-empty {
-        background: transparent;
+        background: transparent; 
       }
       
-      // &.aligned {
-      //   td {
-      //     &.mq-empty {
-      //       background: transparent;
-      //     }
-      //   }
-      // }
     }
 
     td {
       border: none;
       width: auto; /* defensive resets */
-      padding: 0.1em 0.0em;
+      padding: 0.1em 0.3em;
       vertical-align: baseline;
     }
   }
+
+  .mq-aligned {
+    td {
+      border: none;
+      width: auto; /* defensive resets */
+      padding: 0.1em 0.0em;// !important;
+      vertical-align: baseline;
+    }
+  }
+
 }

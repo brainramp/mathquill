@@ -934,6 +934,7 @@ Environments.matrix = P(Environment, function(_, super_) {
     right: null
   };
   _.environment = 'matrix';
+  _.classTemplate = 'mq-matrix'
   _.removeEmptyColumns = true;
   _.removeEmptyRows = true;
 
@@ -988,9 +989,9 @@ Environments.matrix = P(Environment, function(_, super_) {
     });
 
     var tableClasses = this.extraTableClasses ? 'mq-non-leaf ' + this.extraTableClasses : 'mq-non-leaf';
-
+    console.log(this.classTemplate);
     this.htmlTemplate =
-        '<span class="mq-matrix mq-non-leaf">'
+        '<span class="' + this.classTemplate + ' mq-non-leaf">'
       +   parenHtml(this.parentheses.left)
       +   '<table class="' + tableClasses + '">'
       +     trs.replace(/\$tds/g, function () {
@@ -1377,6 +1378,7 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
   };
   _.extraTableClasses = 'rcl aligned';
   _.environment = 'aligned';
+  _.classTemplate = 'mq-aligned';
   var equalities = ['=', '<', '>', '\\le ', '\\ge ']; // DAN todo: add all equalities
   _.equalities = ['=', '<', '>', '\\le ', '\\ge '];
   var rowsWithEquals = [];
@@ -1438,7 +1440,7 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
           if (currentNode[R] !== 0) { // edge case for ending '='
             thirdColFragment = Fragment(currentNode[R], currentNode.parent.ends[R]);
           }
-          this.moveToCell(currentNode, cell[R]);
+          cell[R].appendToCell(currentNode);
           cursor.insAtRightEnd(cell[R]);
 
         }
@@ -1455,12 +1457,12 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     }
 
     if (thirdColFragment !==  0) {
-      this.moveToCell(thirdColFragment, cell[R][R]);
+      cell[R][R].appendToCell(thirdColFragment);
       cursor.insAtRightEnd(cell[R][R]);
     }
     if (nextLineWithEqualityFragment !==  0) {
       this.insert('addRow', cell[R][R]);
-      this.moveToCell(nextLineWithEqualityFragment, cell[R][R][R]);
+      cell[R][R][R].appendToCell(nextLineWithEqualityFragment);
       cursor.insAtRightEnd(cell[R][R][R]);
       this.splitAcrossCells(nextLineWithEqualityFragment, cursor, true);
     }
@@ -1470,46 +1472,46 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     }
   };
   
-  _.html = function() {
-    var cells = [], trs = '', i=0, row;
+  // _.html = function() {
+  //   var cells = [], trs = '', i=0, row;
 
-    function parenHtml(paren) {
-      return (paren) ?
-          '<span class="mq-scaled mq-paren">'
-        +   paren
-        + '</span>' : '';
-    }
+  //   function parenHtml(paren) {
+  //     return (paren) ?
+  //         '<span class="mq-scaled mq-paren">'
+  //       +   paren
+  //       + '</span>' : '';
+  //   }
 
-    // Build <tr><td>.. structure from cells
-    this.eachChild(function (cell) {
-      var isFirstColumn = row !== cell.row;
-      if (isFirstColumn) {
-        row = cell.row;
-        trs += '<tr>$tds</tr>';
-        cells[row] = [];
-      }
-      if (this.parent.htmlColumnSeparator && !isFirstColumn) {
-        cells[row].push(this.parent.htmlColumnSeparator);
-      }
-      cells[row].push('<td>&'+(i++)+'</td>');
-    });
+  //   // Build <tr><td>.. structure from cells
+  //   this.eachChild(function (cell) {
+  //     var isFirstColumn = row !== cell.row;
+  //     if (isFirstColumn) {
+  //       row = cell.row;
+  //       trs += '<tr>$tds</tr>';
+  //       cells[row] = [];
+  //     }
+  //     if (this.parent.htmlColumnSeparator && !isFirstColumn) {
+  //       cells[row].push(this.parent.htmlColumnSeparator);
+  //     }
+  //     cells[row].push('<td>&'+(i++)+'</td>');
+  //   });
 
-    var tableClasses = this.extraTableClasses ? 'mq-non-leaf ' + this.extraTableClasses : 'mq-non-leaf';
+  //   var tableClasses = this.extraTableClasses ? 'mq-non-leaf ' + this.extraTableClasses : 'mq-non-leaf';
+  //   console.log("hereee");  
+  //   this.htmlTemplate =
+  //       '<span class="mq-aligned mq-non-leaf">'
+  //     +   parenHtml(this.parentheses.left)
+  //     +   '<table class="' + tableClasses + '">'
+  //     +     trs.replace(/\$tds/g, function () {
+  //             return cells.shift().join('');
+  //           })
+  //     +   '</table>'
+  //     +   parenHtml(this.parentheses.right)
+  //     + '</span>'
+  //   ;
 
-    this.htmlTemplate =
-        '<span class="mq-aligned mq-non-leaf">'
-      +   parenHtml(this.parentheses.left)
-      +   '<table class="' + tableClasses + '">'
-      +     trs.replace(/\$tds/g, function () {
-              return cells.shift().join('');
-            })
-      +   '</table>'
-      +   parenHtml(this.parentheses.right)
-      + '</span>'
-    ;
-
-    return super_.html.call(this);
-  };
+  //   return super_.html.call(this);
+  // };
 
   _.parser = function() { // old
     var self = this;
@@ -1582,16 +1584,6 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     );
   };
 
-  _.moveToCell = function(fragment, cell) {
-    fragment.disown();
-    fragment.adopt(cell, cell.ends[R], 0);
-    fragment.jQ.appendTo(cell.jQ);
-  };
-  _.createToCell = function(node, cell) { // unused?
-    node.adopt(cell, cell.ends[R], 0);
-    node.jQize().appendTo(cell.jQ);
-  };
-
   _.rowContainsEquality = function(row) {
     if (!this.blocks[row]) {
       throw new OutOfBoundsError("rowContainsEquality(): invalid row number");
@@ -1607,8 +1599,8 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
 
   _.normalizeRow = function(cursor, row) {
     let middleCell = this.blocks[row*3 + 1];
-    this.moveToCell(middleCell.children(), middleCell[L]);
-    this.moveToCell(middleCell[R].children(), middleCell[L]);
+    middleCell[L].appendToCell(middleCell.children());
+    middleCell[L].appendToCell(middleCell[R].children());
     this.splitAcrossCells(middleCell[L].children(), cursor, true);
   };
 
@@ -1621,9 +1613,9 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     }
     let row1End = this.blocks[row1*3 + 2];
     let row2Middle = this.blocks[row2*3 + 1];
-    this.moveToCell(row2Middle[L].children(), row1End);
-    this.moveToCell(row2Middle.children(), row1End);
-    this.moveToCell(row2Middle[R].children(), row1End);
+    row1End.appendToCell(row2Middle[L].children());
+    row1End.appendToCell(row2Middle.children());
+    row1End.appendToCell(row2Middle[R].children());
   }
 
   _.mergeRowsNeatly = function(ctrlr, row1, row2) {
@@ -1740,11 +1732,10 @@ var AlignedCell = P(MathBlock, function(_, super_) {
       this.parent.insert('addRow', this);
       if (found) {
         let cell = found.parent;
-        // maybe change moveToCell to appendValueOf and have it be a cell function // DAN
-        cell.parent.moveToCell(Fragment(found, cell.ends[R]), cell.parent.blocks[(cell.row+1)*3]);
+        cell.parent.blocks[(cell.row+1)*3].appendToCell(Fragment(found, cell.ends[R]));
         cell = cell[R];
         while (this.row === cell.row) {
-          cell.parent.moveToCell(cell.children(), cell.parent.blocks[(cell.row+1)*3]);
+          cell.parent.blocks[(cell.row+1)*3].appendToCell(cell.children());
           cell = cell[R];
         }
         cell.parent.splitAcrossCells(cell.parent.blocks[cell.row*3], cursor, true);
@@ -1778,15 +1769,20 @@ var AlignedCell = P(MathBlock, function(_, super_) {
       return;
     case 'Del':
       if (this !== this.parent.blocks[this.parent.blocks.length-1] || ctrlr.cursor[R]) {
-        super_.keystroke.apply(this, ['Right', null, ctrlr]);
-        if (this.row === ctrlr.cursor.parent.row) {
-          found = this.findSomethingOrEnd(ctrlr, R, L);
-          if (!found && ctrlr.cursor.parent[R]) {
-            super_.keystroke.apply(this, ['Right', null, ctrlr]);
+        found = this.findSomethingOrEnd(ctrlr, R, R);
+        if (!found) {
+          if (cursor.parent[R]) {
+            this.parent.mergeRowsNeatly(ctrlr, this.row, this.row + 1);
           }
-          super_.keystroke.apply(this, ['Backspace', null, ctrlr]);
+          else {
+            this.findSomethingOrEnd(ctrlr, L, L);
+          }
         }
-        this.parent.mergeRowsNeatly(ctrlr, this.row, this.row + 1);
+        else {
+          super_.keystroke.apply(this, arguments);
+          this.findSomethingOrEnd(ctrlr, L, L);
+        }
+        return;
       }
       return;
     case 'Left':
@@ -1812,10 +1808,32 @@ var AlignedCell = P(MathBlock, function(_, super_) {
         }
       }
       return;
+    case 'Tab':
+      e.preventDefault();
+      if (this[R]) {
+        cursor.insAtRightEnd(this[R]);
+      }
+      return;
+    case 'Shift-Tab':
+      e.preventDefault();
+      if (this[L]) {
+        cursor.insAtRightEnd(this[L]);
+      }
+      return;
     }
 
     return super_.keystroke.apply(this, arguments);
   };
+
+  
+  _.appendToCell = function(fragment) {
+    fragment.disown();
+    fragment.adopt(this, this.ends[R], 0);
+    fragment.jQ.appendTo(this.jQ);
+    console.log("using new append");
+  }
+
+
   
   _.afterDeletion = function(ctrlr) {
     if (!this.parent.rowIsEmpty(this.row)) {
