@@ -1786,39 +1786,38 @@ var AlignedCell = P(MathBlock, function(_, super_) {
       }
       return;
     case 'Left':
-      // if at leftmost col and topmost row, dont want to escape
-      if (this !== this.parent.blocks[0] || ctrlr.cursor[L]) {
-        //super_.keystroke.apply(this, arguments);
+      this.findSomethingOrEnd(ctrlr, L, L);
+      if (cursor[L] || cursor.parent[L]) {
+        super_.keystroke.apply(this, arguments);
         this.findSomethingOrEnd(ctrlr, L, L);
-        if (cursor[L] || cursor.parent === this) {
-          super_.keystroke.apply(this, arguments);
-          this.findSomethingOrEnd(ctrlr, L, L);
-        }
       }
       return;
     case 'Right':
-      this.findSomethingOrEnd(ctrlr, R, R);
-      if (cursor.parent !== this.parent.blocks[this.parent.blocks.length-1] || cursor[R]) {
+      found = this.findSomethingOrEnd(ctrlr, R, R);
+      if (!found && !cursor.parent[R]) {
+        this.findSomethingOrEnd(ctrlr, L, L);
+      }
+      else {
         super_.keystroke.apply(this, arguments);
-        if (this.row === cursor.parent.row) {
-          found = this.findSomethingOrEnd(ctrlr, R, L);
-          if (!found && cursor.parent[R]) {
-            super_.keystroke.apply(this, arguments);
-          }
-        }
       }
       return;
+    case 'Down':
+      super_.keystroke.apply(this, arguments);
+      this.findSomethingOrEnd(ctrlr, L, L);
+      return;
+
+    case 'Up':
+      super_.keystroke.apply(this, arguments);
+      this.findSomethingOrEnd(ctrlr, L, L);
+      return;
+
     case 'Tab':
       e.preventDefault();
-      if (this[R]) {
-        cursor.insAtRightEnd(this[R]);
-      }
+      this.keystroke('Right', e, ctrlr);
       return;
     case 'Shift-Tab':
       e.preventDefault();
-      if (this[L]) {
-        cursor.insAtRightEnd(this[L]);
-      }
+      this.keystroke('Left', e, ctrlr);
       return;
     }
 
