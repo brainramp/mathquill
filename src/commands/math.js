@@ -563,7 +563,7 @@ var RootMathBlock = P(MathBlock, function(_, super_) {
     this.controller.handle('edit');
   };
   _.keystroke = function(key, e, ctrlr) {
-    if (key === 'Enter' && !ctrlr.cursor[R]) { 
+    if (key === 'Enter') { 
       let child = this.children().ends[L];
       // avoid creating aligned math if one already exists
       while(child) {
@@ -571,13 +571,18 @@ var RootMathBlock = P(MathBlock, function(_, super_) {
           return;
         child = child[R];
       }
-      // create new Aligned environment
+      let cursor = ctrlr.cursor;
       let aligned = Aligned();
       let prevChildren = this.children();
-      aligned.createLeftOf(this.cursor);
-      //aligned.moveToCell(prevChildren, aligned.blocks[0], 0); // DAN
-      aligned.blocks[0].appendToCell(prevChildren);
-      aligned.splitAcrossCells(prevChildren, this.cursor);
+      let leftOfCursor = cursor[L];
+      cursor.insAtRightEnd(this);
+      aligned.createLeftOf(cursor);
+      let firstBlock = aligned.blocks[0];
+      firstBlock.appendToCell(prevChildren);
+      aligned.normalizeRow(cursor, firstBlock.row);
+      if (leftOfCursor) cursor.insRightOf(leftOfCursor);
+      else cursor.insAtLeftEnd(firstBlock);
+      firstBlock.keystroke('Enter', null, ctrlr);
       return;
     }
     if (ctrlr.options.spaceBehavesLikeTab

@@ -1739,6 +1739,11 @@ var AlignedCell = P(MathBlock, function(_, super_) {
     if (cursor.selection) return super_.keystroke.apply(this, arguments);
     switch (key) {
     case 'Enter':
+      this.findSomethingOrEnd(ctrlr, L, L);
+      let startOfRowReset = false; // edge case
+      if (!cursor[L]) {
+        startOfRowReset = true;
+      }
       found = this.findSomethingOrEnd(ctrlr, R, R);
       this.parent.insert('addRow', this);
       if (found) {
@@ -1755,6 +1760,10 @@ var AlignedCell = P(MathBlock, function(_, super_) {
       }
       else {
         cursor.insAtLeftEnd(this.parent.blocks[(this.row+1) * 3]);
+      }
+      if (startOfRowReset) {
+        cursor.parent.keystroke('Up', null, ctrlr);
+        cursor.parent.keystroke('Down', null, ctrlr);
       }
       return;
     case 'Backspace':
