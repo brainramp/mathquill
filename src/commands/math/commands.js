@@ -1291,7 +1291,6 @@ Environments.matrix = P(Environment, function(_, super_) {
         this.finalizeTree();
       }
       // check if whole matrix empty, then delete it
-      //if (this.removeEmptyRowsIfLeftmost && cell.row === 0) {
       if (this.removeEmptyRows && cell.row === 0) {
         var allEmpty = true; // DAN
         for (var i = 0; i < this.blocks.length; i++) {
@@ -1371,10 +1370,9 @@ Environments.Vmatrix = P(Matrix, function(_, super_) {
  * leftmost column, where upon entering an equalitity, the equality gets
  * automatically positioned in the middle column, and any further typing
  * will be done in the third column.
- * Apologied for poor commenting, I'm running low on time.
  */ 
 var Aligned =
-Environments['aligned'] = P(Matrix, function (_, super_) {
+Environments.aligned = P(Matrix, function (_, super_) {
   _.environment = 'aligned';
   _.matrixType = MatrixTypes.ALIGNED;
   var delimiters = {
@@ -1391,6 +1389,7 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     '\\le ', 
     '\\ge ',
     '\\ne ',
+    '\\neq ',
     '\\ll ',
     '\\gg ',
     '\\sim ',
@@ -1406,11 +1405,12 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
   ];
   var rowsWithEquals = [];
 
-  // Don't delete empty columns, the align environment is for equations and should always have two columns.
   _.removeEmptyColumns = false;
   _.removeEmptyRows = true;
-  _.removeEmptyRowsIfLeftmost = true;
 
+  /**
+   * Generates latex for aligned node
+   */
   _.latex = function() {
     var latex = '';
     var row;
@@ -1433,6 +1433,9 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     return this.wrappers().join(latex);
   };
 
+  /**
+   * Basic aligned instance contains 3 cols and 1 row
+   */
   _.createBlocks = function() {
     this.blocks = [
       AlignedCell(0, this),
@@ -1441,6 +1444,13 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     ];
   };
 
+  /**
+   * Takes fragment in the left-most column of a row, and splits it up
+   * so that each row has a single equality
+   * @param {Fragment} fragment fragment to be split up
+   * @param {Cursor} cursor 
+   * @param {boolean} avoidExtraRow if an extra row should be created
+   */
   _.splitAcrossCells = function(fragment, cursor, avoidExtraRow) {
     var currentNode = fragment.ends[L];
     if (typeof currentNode === 'undefined') return;
@@ -1494,6 +1504,9 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     }
   };
   
+  /**
+   * Parses html into mathquill tree (DOM style) format
+   */
   _.parser = function() { // old
     var self = this;
     var optWhitespace = Parser.optWhitespace;
@@ -1565,6 +1578,10 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     );
   };
 
+  /**
+   * Checks if row contains equality
+   * @param {int} row row number to check
+   */
   _.rowContainsEquality = function(row) {
     if (!this.blocks[row]) {
       throw new OutOfBoundsError("rowContainsEquality(): invalid row number");
@@ -1578,6 +1595,12 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     return false;
   };
 
+  /**
+   * Converts a row which may have multiple equalities or nodes in unexpected
+   * places into a normalized form with one equality centered per row
+   * @param {Cursor} cursor 
+   * @param {integer} row 
+   */
   _.normalizeRow = function(cursor, row) {
     let middleCell = this.blocks[row*3 + 1];
     middleCell[L].appendToCell(middleCell.children());
@@ -1585,20 +1608,27 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     this.splitAcrossCells(middleCell[L].children(), cursor, true);
   };
 
+  /**
+   * Moves the contents of one row to the last cell of another
+   * @param {integer} row1 
+   * @param {integer} row2 
+   */
   _.mergeToEndOfRow = function(row1, row2) {
-    if (!this.blocks[row1*3] || !this.blocks[row2*3]) {
-      throw new Error("mergeRows(): row doesn't exist");
+    if (this.blocks[row1*3] && this.blocks[row2*3]) {
+      let row1End = this.blocks[row1*3 + 2];
+      let row2Middle = this.blocks[row2*3 + 1];
+      row1End.appendToCell(row2Middle[L].children());
+      row1End.appendToCell(row2Middle.children());
+      row1End.appendToCell(row2Middle[R].children());
     }
-    if (row2 !== row1 + 1) {
-      throw new Error("mergeRows(): non consecutive rows provided");
-    }
-    let row1End = this.blocks[row1*3 + 2];
-    let row2Middle = this.blocks[row2*3 + 1];
-    row1End.appendToCell(row2Middle[L].children());
-    row1End.appendToCell(row2Middle.children());
-    row1End.appendToCell(row2Middle[R].children());
   }
 
+  /**
+   * Merge two rows and normalize both of them
+   * @param {Controller} ctrlr 
+   * @param {integer} row1 
+   * @param {integer} row2 
+   */
   _.mergeRowsNeatly = function(ctrlr, row1, row2) {
     // if both rows exist
     if (this.blocks[row1*3] && this.blocks[row2*3]) {
@@ -1664,6 +1694,9 @@ var MatrixCell = P(MathBlock, function(_, super_) {
   }
 });
 
+/**
+ * Cells in the Aligned environment
+ */
 var AlignedCell = P(MathBlock, function(_, super_) {
   _.init = function(row, parent, replaces) {
     super_.init.call(this);
@@ -1680,8 +1713,9 @@ var AlignedCell = P(MathBlock, function(_, super_) {
   };
   
   /**
-   * 
-   * @param {*} ctrlr Controller containing cursor which will be moved
+   * Keep going in a direction (dir) until you find something to the
+   * left/right (pos)
+   * @param {Controller} ctrlr Controller containing cursor which will be moved
    * @param {L or R} dir The direction in which to search
    * @param {L or R} pos Stop when something found to the left/right
    * @return {Node} Node found, or 0 if end
@@ -1689,9 +1723,6 @@ var AlignedCell = P(MathBlock, function(_, super_) {
   _.findSomethingOrEnd = function(ctrlr, dir, pos) {
     let cursor = ctrlr.cursor;
     let cell = cursor.parent;
-    if (typeof cursor[dir] === 'undefined' || cursor[pos] === 'undefined') {    
-      throw new Error("findSomethingOrEnd(): undefined element at cursor");
-    }
     if (cursor[pos] !== 0) {
       return cursor[pos];
     }
@@ -1727,7 +1758,7 @@ var AlignedCell = P(MathBlock, function(_, super_) {
       }
       return;
     case 'Backspace':
-      if (this !== this.parent.blocks[0] || ctrlr.cursor[L]) {
+      if (this !== this.parent.blocks[0] || cursor[L]) {
         found = this.findSomethingOrEnd(ctrlr, L, L);
         if (found) {
           super_.keystroke.apply(this, arguments);
@@ -1748,7 +1779,7 @@ var AlignedCell = P(MathBlock, function(_, super_) {
       }
       return;
     case 'Del':
-      if (this !== this.parent.blocks[this.parent.blocks.length-1] || ctrlr.cursor[R]) {
+      if (this !== this.parent.blocks[this.parent.blocks.length-1] || cursor[R]) {
         found = this.findSomethingOrEnd(ctrlr, R, R);
         if (!found) {
           if (cursor.parent[R]) {
@@ -1804,13 +1835,28 @@ var AlignedCell = P(MathBlock, function(_, super_) {
     return super_.keystroke.apply(this, arguments);
   };
 
-  
+  /**
+   * Appends a fragment to the end of the cell
+   * @param {Fragment} fragment 
+   */
   _.appendToCell = function(fragment) {
     fragment.disown();
     fragment.adopt(this, this.ends[R], 0);
     fragment.jQ.appendTo(this.jQ);
   };
   
+  /**
+   * Action to perform after a node has been inserted
+   * @param {Cursor} cursor 
+   */
+  _.afterInsertion = function(cursor) {
+    this.parent.normalizeRow(cursor, this.row);
+  };
+
+  /**
+   * Action to perform after a node has been deleted
+   * @param {Controller} ctrlr 
+   */
   _.afterDeletion = function(ctrlr) {
     if (!this.parent.rowIsEmpty(this.row)) {
       let nearestLeftNode = this.findSomethingOrEnd(ctrlr, L, L);
@@ -1824,10 +1870,9 @@ var AlignedCell = P(MathBlock, function(_, super_) {
     }
   };
 
-  _.afterInsertion = function(cursor) {
-    this.parent.normalizeRow(cursor, this.row);
-  };
-
+  /**
+   * Converts cell's children from fragment to array 
+   */
   _.asArray = function() {
     let array = [];
     let child = this.children().ends[L];
