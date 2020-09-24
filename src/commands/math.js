@@ -121,12 +121,19 @@ var MathCommand = P(MathElement, function(_, super_) {
     cmd.finalizeInsert(cursor.options);
     cmd.placeCursor(cursor);
     
+    // if in aligned cell, need to perform some autocorrecting
     if (cmd.parent instanceof AlignedCell) {
-      cmd.parent.afterInsertion(cursor);
-      if (!(cmd instanceof Symbol)) cursor.insRightOf(cmd);
-      cmd.parent.afterInsertion(cursor);
-      cmd.finalizeInsert(cursor.options);
-      cmd.placeCursor(cursor);
+      if (cmd instanceof Symbol) {
+        cmd.parent.afterInsertion(cursor);
+        cmd.finalizeInsert(cursor.options);
+        cursor.insRightOf(cmd);
+      }
+      else {
+        cursor.insRightOf(cmd);
+        cmd.parent.afterInsertion(cursor);
+        cmd.finalizeInsert(cursor.options);
+        cmd.placeCursor(cursor);
+      }
     }
   };
   _.createBlocks = function() {
@@ -556,7 +563,7 @@ var RootMathBlock = P(MathBlock, function(_, super_) {
     this.controller.handle('edit');
   };
   _.keystroke = function(key, e, ctrlr) {
-    if (key === 'Enter') { 
+    if (key === 'Enter' && !ctrlr.cursor[R]) { 
       let child = this.children().ends[L];
       // avoid creating aligned math if one already exists
       while(child) {
