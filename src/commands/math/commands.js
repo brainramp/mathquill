@@ -1762,8 +1762,8 @@ var AlignedCell = P(MathBlock, function(_, super_) {
         cursor.insAtLeftEnd(this.parent.blocks[(this.row+1) * 3]);
       }
       if (startOfRowReset) {
-        cursor.parent.keystroke('Up', null, ctrlr);
-        cursor.parent.keystroke('Down', null, ctrlr);
+        cursor.parent.keystroke('Left', null, ctrlr);
+        cursor.parent.keystroke('Right', null, ctrlr);
       }
       return;
     case 'Backspace':
@@ -1775,7 +1775,7 @@ var AlignedCell = P(MathBlock, function(_, super_) {
         else {
           if (this.parent.rowIsEmpty(this.row)) {
             if (found || cursor.parent === this) super_.keystroke.apply(this, arguments);
-            else this.findSomethingOrEnd(ctrlr, L, L);
+            this.findSomethingOrEnd(ctrlr, L, L);
           }
           else {
             super_.keystroke.apply(this, ['Left', null, ctrlr]);

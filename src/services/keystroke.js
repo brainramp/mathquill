@@ -236,14 +236,11 @@ Controller.open(function(_) {
     if (cursor[L].siblingDeleted) cursor[L].siblingDeleted(cursor.options, R);
     if (cursor[R].siblingDeleted) cursor[R].siblingDeleted(cursor.options, L);
     cursor.parent.bubble('reflow');
-    // console.log("deleted, newleft:"); 
-    // console.log(cursor[L].ctrlSeq);
-    // DAN
-    // console.log("what is e:");
-    // console.log(e);
-    // throw new Error("pause here");
-    //return;
-    if (cursor.parent.afterDeletion) cursor.parent.afterDeletion(this);
+    
+    if (cursor.parent.afterDeletion) {
+      cursor.parent.afterDeletion(this);
+      cursor.parent.bubble('reflow');
+    }
     return this;
   };
   _.ctrlDeleteDir = function(dir) {
