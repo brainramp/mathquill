@@ -989,7 +989,6 @@ Environments.matrix = P(Environment, function(_, super_) {
     });
 
     var tableClasses = this.extraTableClasses ? 'mq-non-leaf ' + this.extraTableClasses : 'mq-non-leaf';
-    console.log(this.classTemplate);
     this.htmlTemplate =
         '<span class="' + this.classTemplate + ' mq-non-leaf">'
       +   parenHtml(this.parentheses.left)
@@ -1365,22 +1364,46 @@ Environments.Vmatrix = P(Matrix, function(_, super_) {
   };
 });
 
-var Aligned = // DAN
+/**
+ * Aligned environment which extends Matrix, and currently only supports
+ * three columns. For all intents and purposes, users do not know that
+ * when they press enter they are in a matrix. Users always type in the
+ * leftmost column, where upon entering an equalitity, the equality gets
+ * automatically positioned in the middle column, and any further typing
+ * will be done in the third column.
+ * Apologied for poor commenting, I'm running low on time.
+ */ 
+var Aligned =
 Environments['aligned'] = P(Matrix, function (_, super_) {
+  _.environment = 'aligned';
   _.matrixType = MatrixTypes.ALIGNED;
   var delimiters = {
     column: '&',
     row: '\\\\'
   };
-  _.delimiters = {
-    column: '&',
-    row: '\\\\'
-  };
   _.extraTableClasses = 'rcl aligned';
-  _.environment = 'aligned';
   _.classTemplate = 'mq-aligned';
-  var equalities = ['=', '<', '>', '\\le ', '\\ge ']; // DAN todo: add all equalities
-  _.equalities = ['=', '<', '>', '\\le ', '\\ge '];
+  // list of "equalities" that become automatically centered
+  _.equalities = [
+    '=', 
+    '<', 
+    '>', 
+    '\\le ', 
+    '\\ge ',
+    '\\ne ',
+    '\\ll ',
+    '\\gg ',
+    '\\sim ',
+    '\\simeq ',
+    '\\cong ',
+    '\\equiv ',
+    '\\parallel ',
+    '\\propto ',
+    '\\approx ',
+    '\\rightarrow ',
+    '\\leftarrow ',
+    '\\therefore '
+  ];
   var rowsWithEquals = [];
 
   // Don't delete empty columns, the align environment is for equations and should always have two columns.
@@ -1397,8 +1420,8 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
         if (row !== cell.row) {
           latex += delimiters.row;
         }
-        else { // DAN
-          if (equalities.includes(cell.ends[R].ctrlSeq)) {
+        else {
+          if (cell.parent.equalities.includes(cell.ends[R].ctrlSeq)) {
             latex += delimiters.column;
           }
         }
@@ -1418,7 +1441,6 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     ];
   };
 
-  // only works if calling on left-most cell in row
   _.splitAcrossCells = function(fragment, cursor, avoidExtraRow) {
     var currentNode = fragment.ends[L];
     if (typeof currentNode === 'undefined') return;
@@ -1432,9 +1454,9 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     var nextLineWithEqualityFragment = 0;
     var noEqualities = true;
 
-    cursor.insAtRightEnd(cell); // DAN will this cause issues? no? ok.
+    cursor.insAtRightEnd(cell); // will this cause issues? no? ok.
     while(currentNode !== 0) {
-      if (equalities.includes(currentNode.ctrlSeq)) {
+      if (this.equalities.includes(currentNode.ctrlSeq)) {
         if (noEqualities) {
           noEqualities = false;
           if (currentNode[R] !== 0) { // edge case for ending '='
@@ -1472,55 +1494,14 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
     }
   };
   
-  // _.html = function() {
-  //   var cells = [], trs = '', i=0, row;
-
-  //   function parenHtml(paren) {
-  //     return (paren) ?
-  //         '<span class="mq-scaled mq-paren">'
-  //       +   paren
-  //       + '</span>' : '';
-  //   }
-
-  //   // Build <tr><td>.. structure from cells
-  //   this.eachChild(function (cell) {
-  //     var isFirstColumn = row !== cell.row;
-  //     if (isFirstColumn) {
-  //       row = cell.row;
-  //       trs += '<tr>$tds</tr>';
-  //       cells[row] = [];
-  //     }
-  //     if (this.parent.htmlColumnSeparator && !isFirstColumn) {
-  //       cells[row].push(this.parent.htmlColumnSeparator);
-  //     }
-  //     cells[row].push('<td>&'+(i++)+'</td>');
-  //   });
-
-  //   var tableClasses = this.extraTableClasses ? 'mq-non-leaf ' + this.extraTableClasses : 'mq-non-leaf';
-  //   console.log("hereee");  
-  //   this.htmlTemplate =
-  //       '<span class="mq-aligned mq-non-leaf">'
-  //     +   parenHtml(this.parentheses.left)
-  //     +   '<table class="' + tableClasses + '">'
-  //     +     trs.replace(/\$tds/g, function () {
-  //             return cells.shift().join('');
-  //           })
-  //     +   '</table>'
-  //     +   parenHtml(this.parentheses.right)
-  //     + '</span>'
-  //   ;
-
-  //   return super_.html.call(this);
-  // };
-
   _.parser = function() { // old
     var self = this;
     var optWhitespace = Parser.optWhitespace;
     var string = Parser.string;
 
     return optWhitespace
-    .then(string(/*this.*/delimiters.column)
-      .or(string(/*this.*/delimiters.row))
+    .then(string(delimiters.column)
+      .or(string(delimiters.row))
       .or(latexMathParser.block))
     .many()
     .skip(optWhitespace)
@@ -1558,7 +1539,7 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
                 throw new Error(
                   "Invalid aligned latex: Cannot contain multiple delimiters per row");
               }
-              if (equalities.includes(items[i+1].ends[R].ctrlSeq)) {
+              if (this.equalities.includes(items[i+1].ends[R].ctrlSeq)) {
                 blocks.push(items[++i]);
                 rowsWithEquals[row] = true;
                 delimiterFound = true;
@@ -1645,9 +1626,7 @@ Environments['aligned'] = P(Matrix, function (_, super_) {
       }
     }
   };
-  
 });
-
 
 // Replacement for mathblocks inside matrix cells
 // Adds matrix-specific keyboard commands
@@ -1726,6 +1705,7 @@ var AlignedCell = P(MathBlock, function(_, super_) {
   _.keystroke = function(key, e, ctrlr) {
     let found;
     let cursor = ctrlr.cursor;
+    if (cursor.selection) return super_.keystroke.apply(this, arguments);
     switch (key) {
     case 'Enter':
       found = this.findSomethingOrEnd(ctrlr, R, R);
@@ -1787,7 +1767,7 @@ var AlignedCell = P(MathBlock, function(_, super_) {
       return;
     case 'Left':
       this.findSomethingOrEnd(ctrlr, L, L);
-      if (cursor[L] || cursor.parent[L]) {
+      if (this === cursor.parent && (cursor[L] || cursor.parent[L])) {
         super_.keystroke.apply(this, arguments);
         this.findSomethingOrEnd(ctrlr, L, L);
       }
@@ -1829,10 +1809,7 @@ var AlignedCell = P(MathBlock, function(_, super_) {
     fragment.disown();
     fragment.adopt(this, this.ends[R], 0);
     fragment.jQ.appendTo(this.jQ);
-    console.log("using new append");
-  }
-
-
+  };
   
   _.afterDeletion = function(ctrlr) {
     if (!this.parent.rowIsEmpty(this.row)) {
@@ -1848,9 +1825,7 @@ var AlignedCell = P(MathBlock, function(_, super_) {
   };
 
   _.afterInsertion = function(cursor) {
-    let leftOfCursor = cursor[L]; // thing just inserted
     this.parent.normalizeRow(cursor, this.row);
-    cursor.insRightOf(leftOfCursor);
   };
 
   _.asArray = function() {

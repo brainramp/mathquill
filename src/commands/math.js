@@ -120,6 +120,14 @@ var MathCommand = P(MathElement, function(_, super_) {
     }
     cmd.finalizeInsert(cursor.options);
     cmd.placeCursor(cursor);
+    
+    if (cmd.parent instanceof AlignedCell) {
+      cmd.parent.afterInsertion(cursor);
+      if (!(cmd instanceof Symbol)) cursor.insRightOf(cmd);
+      cmd.parent.afterInsertion(cursor);
+      cmd.finalizeInsert(cursor.options);
+      cmd.placeCursor(cursor);
+    }
   };
   _.createBlocks = function() {
     var cmd = this,
@@ -354,8 +362,6 @@ var Symbol = P(MathCommand, function(_, super_) {
     }
     cmd.finalizeInsert(cursor.options);
     cmd.placeCursor(cursor);
-    // currently only used in AlignedCell to autocorrect things after insertion
-    if(cmd.parent.afterInsertion) cmd.parent.afterInsertion(cursor);
   };
   _.numBlocks = function() { return 0; };
 
