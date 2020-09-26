@@ -1538,7 +1538,7 @@ Environments.aligned = P(Matrix, function (_, super_) {
           }
         }
 
-        let delimiterFound = false;
+        var delimiterFound = false;
         rowsWithEquals = [false];
         for (var i=0; i<items.length; i+=1) {
           if (items[i] instanceof MathBlock) {
@@ -1587,7 +1587,7 @@ Environments.aligned = P(Matrix, function (_, super_) {
       throw new OutOfBoundsError("rowContainsEquality(): invalid row number");
     }
     for (var i = row*3; i < (row+1)*3; i++) {
-      let childrenArray = this.blocks[i].asArray();
+      var childrenArray = this.blocks[i].asArray();
       for (var j = 0; j < childrenArray.length; j++) {
         if (this.equalities.includes(childrenArray[j].ctrlSeq)) return true;
       }
@@ -1602,7 +1602,7 @@ Environments.aligned = P(Matrix, function (_, super_) {
    * @param {integer} row 
    */
   _.normalizeRow = function(cursor, row) {
-    let middleCell = this.blocks[row*3 + 1];
+    var middleCell = this.blocks[row*3 + 1];
     middleCell[L].appendToCell(middleCell.children());
     middleCell[L].appendToCell(middleCell[R].children());
     this.splitAcrossCells(middleCell[L].children(), cursor, true);
@@ -1615,8 +1615,8 @@ Environments.aligned = P(Matrix, function (_, super_) {
    */
   _.mergeToEndOfRow = function(row1, row2) {
     if (this.blocks[row1*3] && this.blocks[row2*3]) {
-      let row1End = this.blocks[row1*3 + 2];
-      let row2Middle = this.blocks[row2*3 + 1];
+      var row1End = this.blocks[row1*3 + 2];
+      var row2Middle = this.blocks[row2*3 + 1];
       row1End.appendToCell(row2Middle[L].children());
       row1End.appendToCell(row2Middle.children());
       row1End.appendToCell(row2Middle[R].children());
@@ -1635,9 +1635,9 @@ Environments.aligned = P(Matrix, function (_, super_) {
       // merge two rows if they dont both have equalities
       if (!(this.rowContainsEquality(row1) && 
             this.rowContainsEquality(row2))) {
-              let cursor = ctrlr.cursor;
+              var cursor = ctrlr.cursor;
         // find leftmost node to return the cursor to
-        let found = cursor.parent.findSomethingOrEnd(ctrlr, L, L);
+        var found = cursor.parent.findSomethingOrEnd(ctrlr, L, L);
         if (!found && cursor.parent.row === row2) {
           cursor.insAtRightEnd(this.blocks[row2*3-1]);
           found = cursor.parent.findSomethingOrEnd(ctrlr, L, L);
@@ -1721,8 +1721,8 @@ var AlignedCell = P(MathBlock, function(_, super_) {
    * @return {Node} Node found, or 0 if end
    */
   _.findSomethingOrEnd = function(ctrlr, dir, pos) {
-    let cursor = ctrlr.cursor;
-    let cell = cursor.parent;
+    var cursor = ctrlr.cursor;
+    var cell = cursor.parent;
     if (cursor[pos] !== 0) {
       return cursor[pos];
     }
@@ -1734,20 +1734,20 @@ var AlignedCell = P(MathBlock, function(_, super_) {
   };
   
   _.keystroke = function(key, e, ctrlr) {
-    let found;
-    let cursor = ctrlr.cursor;
+    var found;
+    var cursor = ctrlr.cursor;
     if (cursor.selection) return super_.keystroke.apply(this, arguments);
     switch (key) {
     case 'Enter':
       this.findSomethingOrEnd(ctrlr, L, L);
-      let startOfRowReset = false; // edge case
+      var startOfRowReset = false; // edge case
       if (!cursor[L]) {
         startOfRowReset = true;
       }
       found = this.findSomethingOrEnd(ctrlr, R, R);
       this.parent.insert('addRow', this);
       if (found) {
-        let cell = found.parent;
+        var cell = found.parent;
         cell.parent.blocks[(cell.row+1)*3].appendToCell(Fragment(found, cell.ends[R]));
         cell = cell[R];
         while (this.row === cell.row) {
@@ -1868,7 +1868,7 @@ var AlignedCell = P(MathBlock, function(_, super_) {
    */
   _.afterDeletion = function(ctrlr) {
     if (!this.parent.rowIsEmpty(this.row)) {
-      let nearestLeftNode = this.findSomethingOrEnd(ctrlr, L, L);
+      var nearestLeftNode = this.findSomethingOrEnd(ctrlr, L, L);
       this.parent.normalizeRow(ctrlr.cursor, this.row);
       if (!nearestLeftNode) {
         ctrlr.cursor.insAtLeftEnd(this.parent.blocks[this.row*3]);
@@ -1883,8 +1883,8 @@ var AlignedCell = P(MathBlock, function(_, super_) {
    * Converts cell's children from fragment to array 
    */
   _.asArray = function() {
-    let array = [];
-    let child = this.children().ends[L];
+    var array = [];
+    var child = this.children().ends[L];
     while (child) {
       array.push(child);
       child = child[R];

@@ -564,20 +564,20 @@ var RootMathBlock = P(MathBlock, function(_, super_) {
   };
   _.keystroke = function(key, e, ctrlr) {
     if (key === 'Enter') { // creates and normalizes aligned instance
-      let child = this.children().ends[L];
+      var child = this.children().ends[L];
       // avoid creating aligned math if one already exists
       while(child) {
         if (child instanceof Aligned)
           return;
         child = child[R];
       }
-      let cursor = ctrlr.cursor;
-      let aligned = Aligned();
-      let prevChildren = this.children();
-      let leftOfCursor = cursor[L];
+      var cursor = ctrlr.cursor;
+      var aligned = Aligned();
+      var prevChildren = this.children();
+      var leftOfCursor = cursor[L];
       cursor.insAtRightEnd(this);
       aligned.createLeftOf(cursor);
-      let firstBlock = aligned.blocks[0];
+      var firstBlock = aligned.blocks[0];
       firstBlock.appendToCell(prevChildren);
       aligned.normalizeRow(cursor, firstBlock.row);
       if (leftOfCursor) cursor.insRightOf(leftOfCursor);
