@@ -85,11 +85,12 @@ Controller.open(function(_) {
         if (text) textarea.select();
       };
       textareaSpan.remove();
-      
+
+      this.container.unbind('copy input keydown keypress focusout keyup cut paste');
       this.unbindFocusBlurEvents();
       
       ctrlr.blurred = true;
-      textarea.bind('cut paste', false);
+      // textarea.bind('cut paste', false);
   };
   _.typedText = function(ch) {
     if (ch === '\n') return this.handle('enter');
