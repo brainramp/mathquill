@@ -563,7 +563,7 @@ var RootMathBlock = P(MathBlock, function(_, super_) {
     this.controller.handle('edit');
   };
   _.keystroke = function(key, e, ctrlr) {
-    if (key === 'Enter') { // creates and normalizes aligned instance
+    if (key === 'Enter' && ctrlr.options.enterCreatesAligned) { // creates and normalizes aligned instance
       var child = this.children().ends[L];
       // avoid creating aligned math if one already exists
       while(child) {
