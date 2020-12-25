@@ -894,6 +894,252 @@ var Environment = P(MathCommand, function(_, super_) {
   };
 });
 
+
+// Replacement for mathblocks inside matrix cells
+// Adds matrix-specific keyboard commands
+var MatrixCell = P(MathBlock, function(_, super_) {
+  _.init = function(row, parent, replaces) {
+    super_.init.call(this);
+    this.row = row;
+    if (parent) {
+      this.adopt(parent, parent.ends[R], 0);
+    }
+    if (replaces) {
+      for (var i=0; i<replaces.length; i++) {
+        replaces[i].children().adopt(this, this.ends[R], 0);
+      }
+    }
+  };
+  _.keystroke = function(key, e, ctrlr) {
+    switch (key) {
+    case 'Shift-Spacebar':
+      e.preventDefault();
+      return this.parent.insert('addColumn', this);
+      break;
+    case 'Shift-Enter':
+    return this.parent.insert('addRow', this);
+      break;
+    }
+    return super_.keystroke.apply(this, arguments);
+  };
+  _.deleteOutOf = function(dir, cursor) {
+    var self = this, args = arguments;
+    this.parent.backspace(this, dir, cursor, function () {
+      // called when last cell gets deleted
+      return super_.deleteOutOf.apply(self, args);
+    });
+  }
+});
+
+/**
+ * Cells in the Aligned environment
+ */
+var AlignedCell = P(MathBlock, function(_, super_) {
+  _.init = function(row, parent, replaces) {
+    super_.init.call(this);
+    this.row = row;
+    if (replaces === 0) return; // eh ???
+    if (parent) {
+      this.adopt(parent, parent.ends[R], 0);
+    }
+    if (replaces) {
+      for (var i=0; i<replaces.length; i++) {
+        replaces[i].children().adopt(this, this.ends[R], 0);
+      }
+    }
+  };
+  
+  /**
+   * Keep going in a direction (dir) until you find something to the
+   * left/right (pos)
+   * @param {Controller} ctrlr Controller containing cursor which will be moved
+   * @param {L or R} dir The direction in which to search
+   * @param {L or R} pos Stop when something found to the left/right
+   * @return {Node} Node found, or 0 if end
+   */
+  _.findSomethingOrEnd = function(ctrlr, dir, pos) {
+    var cursor = ctrlr.cursor;
+    var cell = cursor.parent;
+    if (cursor[pos] !== 0) {
+      return cursor[pos];
+    }
+    if (cursor[dir] === 0 && (!cell[dir] || (cell.row !== cell[dir].row))) {
+      return 0;
+    }
+    super_.keystroke.apply(cell, [(dir === R ? 'Right' : 'Left'), null, ctrlr]);
+    return this.findSomethingOrEnd(ctrlr, dir, pos);
+  };
+  
+  _.keystroke = function(key, e, ctrlr) {
+    var found;
+    var cursor = ctrlr.cursor;
+    if (cursor.selection) return super_.keystroke.apply(this, arguments);
+    switch (key) {
+    case 'Enter':
+      this.findSomethingOrEnd(ctrlr, L, L);
+      var startOfRowReset = false; // edge case
+      if (!cursor[L]) {
+        startOfRowReset = true;
+      }
+      found = this.findSomethingOrEnd(ctrlr, R, R);
+      this.parent.insert('addRow', this);
+      if (found) {
+        var cell = found.parent;
+        cell.parent.blocks[(cell.row+1)*3].appendToCell(Fragment(found, cell.ends[R]));
+        cell = cell[R];
+        while (this.row === cell.row) {
+          cell.parent.blocks[(cell.row+1)*3].appendToCell(cell.children());
+          cell = cell[R];
+        }
+        cell.parent.splitAcrossCells(cell.parent.blocks[cell.row*3], cursor, true);
+        cursor.insLeftOf(found);
+        this.findSomethingOrEnd(ctrlr, L, L);
+      }
+      else {
+        cursor.insAtLeftEnd(this.parent.blocks[(this.row+1) * 3]);
+      }
+      if (startOfRowReset) {
+        cursor.parent.keystroke('Left', null, ctrlr);
+        cursor.parent.keystroke('Right', null, ctrlr);
+      }
+      return;
+    case 'Backspace':
+      if (this !== this.parent.blocks[0] || cursor[L]) {
+        found = this.findSomethingOrEnd(ctrlr, L, L);
+        if (found) {
+          super_.keystroke.apply(this, arguments);
+        }
+        else {
+          if (this.parent.rowIsEmpty(this.row)) {
+            if (found || cursor.parent === this) super_.keystroke.apply(this, arguments);
+            this.findSomethingOrEnd(ctrlr, L, L);
+          }
+          else {
+            super_.keystroke.apply(this, ['Left', null, ctrlr]);
+            this.parent.mergeRowsNeatly(ctrlr, this.row-1, this.row);
+          }
+        }
+      }
+      else {
+        super_.keystroke.apply(this, arguments);
+      }
+      return;
+    case 'Del':
+      if (this !== this.parent.blocks[this.parent.blocks.length-1] || cursor[R]) {
+        found = this.findSomethingOrEnd(ctrlr, R, R);
+        if (!found) {
+          if (cursor.parent[R]) {
+            this.parent.mergeRowsNeatly(ctrlr, this.row, this.row + 1);
+          }
+          else {
+            this.findSomethingOrEnd(ctrlr, L, L);
+          }
+        }
+        else {
+          super_.keystroke.apply(this, arguments);
+          this.findSomethingOrEnd(ctrlr, L, L);
+        }
+        return;
+      }
+      return;
+    case 'Left':
+      this.findSomethingOrEnd(ctrlr, L, L);
+      if (this === cursor.parent && (cursor[L] || cursor.parent[L])) {
+        super_.keystroke.apply(this, arguments);
+        this.findSomethingOrEnd(ctrlr, L, L);
+      }
+      return;
+    case 'Right':
+      found = this.findSomethingOrEnd(ctrlr, R, R);
+      if (!found && !cursor.parent[R]) {
+        this.findSomethingOrEnd(ctrlr, L, L);
+      }
+      else {
+        super_.keystroke.apply(this, arguments);
+      }
+      return;
+    case 'Down':
+      super_.keystroke.apply(this, arguments);
+      this.findSomethingOrEnd(ctrlr, L, L);
+      return;
+
+    case 'Up':
+      super_.keystroke.apply(this, arguments);
+      this.findSomethingOrEnd(ctrlr, L, L);
+      return;
+
+    case 'Tab':
+      e.preventDefault();
+      this.keystroke('Right', e, ctrlr);
+      return;
+    case 'Shift-Tab':
+      e.preventDefault();
+      this.keystroke('Left', e, ctrlr);
+      return;
+    }
+
+    return super_.keystroke.apply(this, arguments);
+  };
+
+  /**
+   * Appends a fragment to the end of the cell
+   * @param {Fragment} fragment 
+   */
+  _.appendToCell = function(fragment) {
+    fragment.disown();
+    fragment.adopt(this, this.ends[R], 0);
+    fragment.jQ.appendTo(this.jQ);
+  };
+  
+  /**
+   * Action to perform after a node has been inserted
+   * @param {Cursor} cursor 
+   */
+  _.afterInsertion = function(cursor) {
+    this.parent.normalizeRow(cursor, this.row);
+  };
+
+  /**
+   * Action to perform after a node has been deleted
+   * @param {Controller} ctrlr 
+   */
+  _.afterDeletion = function(ctrlr) {
+    if (!this.parent.rowIsEmpty(this.row)) {
+      var nearestLeftNode = this.findSomethingOrEnd(ctrlr, L, L);
+      this.parent.normalizeRow(ctrlr.cursor, this.row);
+      if (!nearestLeftNode) {
+        ctrlr.cursor.insAtLeftEnd(this.parent.blocks[this.row*3]);
+      }
+      else {
+        ctrlr.cursor.insRightOf(nearestLeftNode);
+      }
+    }
+  };
+
+  /**
+   * Converts cell's children from fragment to array 
+   */
+  _.asArray = function() {
+    var array = [];
+    var child = this.children().ends[L];
+    while (child) {
+      array.push(child);
+      child = child[R];
+    }
+    return array;
+  };
+
+  _.deleteOutOf = function(dir, cursor) {
+    var self = this, args = arguments;
+    this.parent.backspace(this, dir, cursor, function () {
+      // called when last cell gets deleted
+      return super_.deleteOutOf.apply(self, args);
+    });
+  };
+
+});
+
+
 var Matrix =
 Environments.matrix = P(Environment, function(_, super_) {
   _.cellType = MatrixCell;
@@ -1080,7 +1326,7 @@ Environments.matrix = P(Environment, function(_, super_) {
         shortfall = maxLength - rows[i].length;
         while (shortfall) {
           position = maxLength*i + rows[i].length;
-          blocks.splice(position, 0, _.cellType(i, this))
+          blocks.splice(position, 0, this.cellType(i, this))
           shortfall-=1;
         }
       }
@@ -1169,7 +1415,7 @@ Environments.matrix = P(Environment, function(_, super_) {
 
     // Add new cells, one for each column
     for (var i=0; i<columns; i+=1) {
-      block = _.cellType(row+1);
+      block = this.cellType(row+1);
       block.parent = this;
       newCells.push(block);
 
@@ -1197,7 +1443,7 @@ Environments.matrix = P(Environment, function(_, super_) {
 
     // Add new cells, one for each row
     for (var i=0; i<rows.length; i+=1) {
-      block = _.cellType(i);
+      block = this.cellType(i);
       block.parent = this;
       newCells.push(block);
       rows[i].splice(column, 0, block);
@@ -1603,248 +1849,4 @@ Environments.aligned = P(Matrix, function (_, super_) {
       }
     }
   };
-});
-
-// Replacement for mathblocks inside matrix cells
-// Adds matrix-specific keyboard commands
-var MatrixCell = P(MathBlock, function(_, super_) {
-  _.init = function(row, parent, replaces) {
-    super_.init.call(this);
-    this.row = row;
-    if (parent) {
-      this.adopt(parent, parent.ends[R], 0);
-    }
-    if (replaces) {
-      for (var i=0; i<replaces.length; i++) {
-        replaces[i].children().adopt(this, this.ends[R], 0);
-      }
-    }
-  };
-  _.keystroke = function(key, e, ctrlr) {
-    switch (key) {
-    case 'Shift-Spacebar':
-      e.preventDefault();
-      return this.parent.insert('addColumn', this);
-      break;
-    case 'Shift-Enter':
-    return this.parent.insert('addRow', this);
-      break;
-    }
-    return super_.keystroke.apply(this, arguments);
-  };
-  _.deleteOutOf = function(dir, cursor) {
-    var self = this, args = arguments;
-    this.parent.backspace(this, dir, cursor, function () {
-      // called when last cell gets deleted
-      return super_.deleteOutOf.apply(self, args);
-    });
-  }
-});
-
-/**
- * Cells in the Aligned environment
- */
-var AlignedCell = P(MathBlock, function(_, super_) {
-  _.init = function(row, parent, replaces) {
-    super_.init.call(this);
-    this.row = row;
-    if (replaces === 0) return; // eh
-    if (parent) {
-      this.adopt(parent, parent.ends[R], 0);
-    }
-    if (replaces) {
-      for (var i=0; i<replaces.length; i++) {
-        replaces[i].children().adopt(this, this.ends[R], 0);
-      }
-    }
-  };
-  
-  /**
-   * Keep going in a direction (dir) until you find something to the
-   * left/right (pos)
-   * @param {Controller} ctrlr Controller containing cursor which will be moved
-   * @param {L or R} dir The direction in which to search
-   * @param {L or R} pos Stop when something found to the left/right
-   * @return {Node} Node found, or 0 if end
-   */
-  _.findSomethingOrEnd = function(ctrlr, dir, pos) {
-    var cursor = ctrlr.cursor;
-    var cell = cursor.parent;
-    if (cursor[pos] !== 0) {
-      return cursor[pos];
-    }
-    if (cursor[dir] === 0 && (!cell[dir] || (cell.row !== cell[dir].row))) {
-      return 0;
-    }
-    super_.keystroke.apply(cell, [(dir === R ? 'Right' : 'Left'), null, ctrlr]);
-    return this.findSomethingOrEnd(ctrlr, dir, pos);
-  };
-  
-  _.keystroke = function(key, e, ctrlr) {
-    var found;
-    var cursor = ctrlr.cursor;
-    if (cursor.selection) return super_.keystroke.apply(this, arguments);
-    switch (key) {
-    case 'Enter':
-      this.findSomethingOrEnd(ctrlr, L, L);
-      var startOfRowReset = false; // edge case
-      if (!cursor[L]) {
-        startOfRowReset = true;
-      }
-      found = this.findSomethingOrEnd(ctrlr, R, R);
-      this.parent.insert('addRow', this);
-      if (found) {
-        var cell = found.parent;
-        cell.parent.blocks[(cell.row+1)*3].appendToCell(Fragment(found, cell.ends[R]));
-        cell = cell[R];
-        while (this.row === cell.row) {
-          cell.parent.blocks[(cell.row+1)*3].appendToCell(cell.children());
-          cell = cell[R];
-        }
-        cell.parent.splitAcrossCells(cell.parent.blocks[cell.row*3], cursor, true);
-        cursor.insLeftOf(found);
-        this.findSomethingOrEnd(ctrlr, L, L);
-      }
-      else {
-        cursor.insAtLeftEnd(this.parent.blocks[(this.row+1) * 3]);
-      }
-      if (startOfRowReset) {
-        cursor.parent.keystroke('Left', null, ctrlr);
-        cursor.parent.keystroke('Right', null, ctrlr);
-      }
-      return;
-    case 'Backspace':
-      if (this !== this.parent.blocks[0] || cursor[L]) {
-        found = this.findSomethingOrEnd(ctrlr, L, L);
-        if (found) {
-          super_.keystroke.apply(this, arguments);
-        }
-        else {
-          if (this.parent.rowIsEmpty(this.row)) {
-            if (found || cursor.parent === this) super_.keystroke.apply(this, arguments);
-            this.findSomethingOrEnd(ctrlr, L, L);
-          }
-          else {
-            super_.keystroke.apply(this, ['Left', null, ctrlr]);
-            this.parent.mergeRowsNeatly(ctrlr, this.row-1, this.row);
-          }
-        }
-      }
-      else {
-        super_.keystroke.apply(this, arguments);
-      }
-      return;
-    case 'Del':
-      if (this !== this.parent.blocks[this.parent.blocks.length-1] || cursor[R]) {
-        found = this.findSomethingOrEnd(ctrlr, R, R);
-        if (!found) {
-          if (cursor.parent[R]) {
-            this.parent.mergeRowsNeatly(ctrlr, this.row, this.row + 1);
-          }
-          else {
-            this.findSomethingOrEnd(ctrlr, L, L);
-          }
-        }
-        else {
-          super_.keystroke.apply(this, arguments);
-          this.findSomethingOrEnd(ctrlr, L, L);
-        }
-        return;
-      }
-      return;
-    case 'Left':
-      this.findSomethingOrEnd(ctrlr, L, L);
-      if (this === cursor.parent && (cursor[L] || cursor.parent[L])) {
-        super_.keystroke.apply(this, arguments);
-        this.findSomethingOrEnd(ctrlr, L, L);
-      }
-      return;
-    case 'Right':
-      found = this.findSomethingOrEnd(ctrlr, R, R);
-      if (!found && !cursor.parent[R]) {
-        this.findSomethingOrEnd(ctrlr, L, L);
-      }
-      else {
-        super_.keystroke.apply(this, arguments);
-      }
-      return;
-    case 'Down':
-      super_.keystroke.apply(this, arguments);
-      this.findSomethingOrEnd(ctrlr, L, L);
-      return;
-
-    case 'Up':
-      super_.keystroke.apply(this, arguments);
-      this.findSomethingOrEnd(ctrlr, L, L);
-      return;
-
-    case 'Tab':
-      e.preventDefault();
-      this.keystroke('Right', e, ctrlr);
-      return;
-    case 'Shift-Tab':
-      e.preventDefault();
-      this.keystroke('Left', e, ctrlr);
-      return;
-    }
-
-    return super_.keystroke.apply(this, arguments);
-  };
-
-  /**
-   * Appends a fragment to the end of the cell
-   * @param {Fragment} fragment 
-   */
-  _.appendToCell = function(fragment) {
-    fragment.disown();
-    fragment.adopt(this, this.ends[R], 0);
-    fragment.jQ.appendTo(this.jQ);
-  };
-  
-  /**
-   * Action to perform after a node has been inserted
-   * @param {Cursor} cursor 
-   */
-  _.afterInsertion = function(cursor) {
-    this.parent.normalizeRow(cursor, this.row);
-  };
-
-  /**
-   * Action to perform after a node has been deleted
-   * @param {Controller} ctrlr 
-   */
-  _.afterDeletion = function(ctrlr) {
-    if (!this.parent.rowIsEmpty(this.row)) {
-      var nearestLeftNode = this.findSomethingOrEnd(ctrlr, L, L);
-      this.parent.normalizeRow(ctrlr.cursor, this.row);
-      if (!nearestLeftNode) {
-        ctrlr.cursor.insAtLeftEnd(this.parent.blocks[this.row*3]);
-      }
-      else {
-        ctrlr.cursor.insRightOf(nearestLeftNode);
-      }
-    }
-  };
-
-  /**
-   * Converts cell's children from fragment to array 
-   */
-  _.asArray = function() {
-    var array = [];
-    var child = this.children().ends[L];
-    while (child) {
-      array.push(child);
-      child = child[R];
-    }
-    return array;
-  };
-
-  _.deleteOutOf = function(dir, cursor) {
-    var self = this, args = arguments;
-    this.parent.backspace(this, dir, cursor, function () {
-      // called when last cell gets deleted
-      return super_.deleteOutOf.apply(self, args);
-    });
-  };
-
 });
