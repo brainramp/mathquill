@@ -894,14 +894,9 @@ var Environment = P(MathCommand, function(_, super_) {
   };
 });
 
-var MatrixTypes = { // DAN sucks
-  MATRIX: 'Matrix',
-  ALIGNED: 'Aligned'
-}
-
 var Matrix =
 Environments.matrix = P(Environment, function(_, super_) {
-  _.matrixType = MatrixTypes.MATRIX;
+  _.cellType = MatrixCell;
 
   var delimiters = {
     column: '&',
@@ -983,9 +978,6 @@ Environments.matrix = P(Environment, function(_, super_) {
   };
   // Create default 4-cell matrix
   _.createBlocks = function() {
-    if (this.matrixType != MatrixTypes.MATRIX) {
-      throw new Error("Must override createBlocks() function")
-    }
     this.blocks = [
       MatrixCell(0, this),
       MatrixCell(0, this),
@@ -994,10 +986,6 @@ Environments.matrix = P(Environment, function(_, super_) {
     ];
   };
   _.parser = function() {
-    
-    if (this.matrixType != MatrixTypes.MATRIX) {
-      throw new Error("Must override parser() function")
-    }
     var self = this;
     var optWhitespace = Parser.optWhitespace;
     var string = Parser.string;
@@ -1092,13 +1080,7 @@ Environments.matrix = P(Environment, function(_, super_) {
         shortfall = maxLength - rows[i].length;
         while (shortfall) {
           position = maxLength*i + rows[i].length;
-          switch (this.matrixType) {
-            case MatrixTypes.MATRIX:
-              blocks.splice(position, 0, MatrixCell(i, this));
-              break;
-            case MatrixTypes.ALIGNED:
-              blocks.splice(position, 0, AlignedCell(i, this));
-          }
+          blocks.splice(position, 0, _.cellType(i, this))
           shortfall-=1;
         }
       }
@@ -1187,13 +1169,7 @@ Environments.matrix = P(Environment, function(_, super_) {
 
     // Add new cells, one for each column
     for (var i=0; i<columns; i+=1) {
-      switch (this.matrixType) {
-        case MatrixTypes.MATRIX:
-          block = MatrixCell(row+1);
-          break;
-        case MatrixTypes.ALIGNED:
-          block = AlignedCell(row+1);
-      }
+      block = _.cellType(row+1);
       block.parent = this;
       newCells.push(block);
 
@@ -1221,14 +1197,7 @@ Environments.matrix = P(Environment, function(_, super_) {
 
     // Add new cells, one for each row
     for (var i=0; i<rows.length; i+=1) {
-      switch (this.matrixType) {
-        case MatrixTypes.MATRIX:
-          block = MatrixCell(i);
-          break;
-        case MatrixTypes.ALIGNED:
-          block = AlignedCell(i);
-      }
-      //block = MatrixCell(i);
+      block = _.cellType(i);
       block.parent = this;
       newCells.push(block);
       rows[i].splice(column, 0, block);
@@ -1352,7 +1321,7 @@ Environments.Vmatrix = P(Matrix, function(_, super_) {
 var Aligned =
 Environments.aligned = P(Matrix, function (_, super_) {
   _.environment = 'aligned';
-  _.matrixType = MatrixTypes.ALIGNED;
+  _.cellType = AlignedCell;
   var delimiters = {
     column: '&',
     row: '\\\\'
