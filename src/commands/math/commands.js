@@ -292,8 +292,6 @@ var SupSub = P(MathCommand, function(_, super_) {
       };
     }(this, 'sub sup'.split(' ')[i], 'sup sub'.split(' ')[i], 'down up'.split(' ')[i]));
   };
-  _.reflow = function() {};
-
 });
 
 function insLeftOfMeUnlessAtEnd(cursor) {
@@ -896,7 +894,7 @@ var Environment = P(MathCommand, function(_, super_) {
   };
 });
 
-var MatrixTypes = { // DAN
+var MatrixTypes = { // DAN sucks
   MATRIX: 'Matrix',
   ALIGNED: 'Aligned'
 }
