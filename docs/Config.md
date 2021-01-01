@@ -38,6 +38,10 @@ If `spaceBehavesLikeTab` is true the keystrokes `{Shift-,}Spacebar` will behave 
 
 The animated demo on <mathquill.com> has this behavior.
 
+## enterCreatesAligned
+
+If `enterCreatesAligned` is true the keystroke `Enter` will create an `aligned` environment if one does not already exist.
+
 ## leftRightIntoCmdGoes
 
 This allows you to change the way the left and right keys move the cursor when there are items of different height, like fractions.
